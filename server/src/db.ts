@@ -1,51 +1,31 @@
-import { DatabaseSync } from 'node:sqlite';
+import { createClient, type Client } from '@libsql/client';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.DB_PATH ?? path.join(__dirname, '..', 'data.sqlite');
 
-export const db = new DatabaseSync(dbPath);
+// Persistenza: su hosting gratuiti (Render, Railway, Fly) il disco è
+// effimero e viene azzerato a ogni deploy. Usiamo libSQL/Turso — stesso
+// client sia per un file locale (`file:...`, sviluppo) sia per il database
+// remoto (`libsql://...`, produzione): il codice è uno solo, cambia solo
+// l'URL.
+//
+//   DATABASE_URL=libsql://<nome>-<org>.turso.io
+//   DATABASE_AUTH_TOKEN=<token generato con la CLI Turso>
+//
+// Senza queste variabili si ricade su un file locale accanto al server.
+const remoteUrl = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
+const authToken = process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+const localPath = process.env.DB_PATH ?? path.join(__dirname, '..', 'data.sqlite');
+const localUrl = localPath === ':memory:' ? ':memory:' : `file:${localPath}`;
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS app_state (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    points INTEGER NOT NULL,
-    freq TEXT NOT NULL,
-    fast_active INTEGER NOT NULL,
-    fast_start INTEGER NOT NULL,
-    greeting_name TEXT NOT NULL
-  );
+export const db: Client = createClient(
+  remoteUrl ? { url: remoteUrl, authToken } : { url: localUrl }
+);
 
-  CREATE TABLE IF NOT EXISTS meals (
-    date TEXT NOT NULL,
-    meal_key TEXT NOT NULL,
-    done INTEGER NOT NULL,
-    foods TEXT NOT NULL,
-    time TEXT NOT NULL,
-    PRIMARY KEY (date, meal_key)
-  );
-
-  CREATE TABLE IF NOT EXISTS patients (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    initials TEXT NOT NULL,
-    plan TEXT NOT NULL,
-    adherence TEXT NOT NULL,
-    tone TEXT NOT NULL,
-    streak INTEGER NOT NULL,
-    last_meal_summary TEXT NOT NULL,
-    last_time TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS patient_meals (
-    patient_id TEXT NOT NULL,
-    meal_key TEXT NOT NULL,
-    time TEXT NOT NULL,
-    foods TEXT NOT NULL,
-    PRIMARY KEY (patient_id, meal_key)
-  );
-`);
+export function isRemoteDb(): boolean {
+  return !!remoteUrl;
+}
 
 function isoDaysAgo(n: number): string {
   const d = new Date();
@@ -53,17 +33,63 @@ function isoDaysAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function seedIfEmpty() {
-  const stateRow = db.prepare('SELECT id FROM app_state WHERE id = 1').get();
-  if (!stateRow) {
-    db.prepare(
-      `INSERT INTO app_state (id, points, freq, fast_active, fast_start, greeting_name)
-       VALUES (1, ?, ?, ?, ?, ?)`
-    ).run(320, 'day', 1, Date.now() - (14 * 3600 + 20 * 60) * 1000, 'Sofia');
-
-    const insertMeal = db.prepare(
-      'INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, ?, ?, ?)'
+// Crea lo schema alla partenza. Va atteso prima di servire richieste: con un
+// database remoto l'inizializzazione è una chiamata di rete.
+export async function initDb(): Promise<void> {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      points INTEGER NOT NULL,
+      freq TEXT NOT NULL,
+      fast_active INTEGER NOT NULL,
+      fast_start INTEGER NOT NULL,
+      greeting_name TEXT NOT NULL
     );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS meals (
+      date TEXT NOT NULL,
+      meal_key TEXT NOT NULL,
+      done INTEGER NOT NULL,
+      foods TEXT NOT NULL,
+      time TEXT NOT NULL,
+      PRIMARY KEY (date, meal_key)
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS patients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      initials TEXT NOT NULL,
+      plan TEXT NOT NULL,
+      adherence TEXT NOT NULL,
+      tone TEXT NOT NULL,
+      streak INTEGER NOT NULL,
+      last_meal_summary TEXT NOT NULL,
+      last_time TEXT NOT NULL
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS patient_meals (
+      patient_id TEXT NOT NULL,
+      meal_key TEXT NOT NULL,
+      time TEXT NOT NULL,
+      foods TEXT NOT NULL,
+      PRIMARY KEY (patient_id, meal_key)
+    );
+  `);
+
+  await seedIfEmpty();
+}
+
+async function seedIfEmpty(): Promise<void> {
+  const { rows: stateRows } = await db.execute('SELECT id FROM app_state WHERE id = 1');
+  if (!stateRows.length) {
+    await db.execute({
+      sql: `INSERT INTO app_state (id, points, freq, fast_active, fast_start, greeting_name)
+            VALUES (1, ?, ?, ?, ?, ?)`,
+      args: [320, 'day', 1, Date.now() - (14 * 3600 + 20 * 60) * 1000, 'Sofia'],
+    });
 
     // Today: only breakfast logged so far, matching the prototype's default.
     const today = isoDaysAgo(0);
@@ -74,7 +100,10 @@ function seedIfEmpty() {
       ['spuntino', 0, '[]', '16:30'],
     ];
     for (const [key, done, foods, time] of todaySeed) {
-      insertMeal.run(today, key, done, foods, time);
+      await db.execute({
+        sql: 'INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, ?, ?, ?)',
+        args: [today, key, done, foods, time],
+      });
     }
 
     // A bit of history so the Premi tab (streak / week chart / badges) has
@@ -94,20 +123,15 @@ function seedIfEmpty() {
       [6, 'colazione', JSON.stringify(['Uova', 'Frutta']), '08:15'],
     ];
     for (const [daysAgo, key, foods, time] of history) {
-      insertMeal.run(isoDaysAgo(daysAgo), key, 1, foods, time);
+      await db.execute({
+        sql: 'INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 1, ?, ?)',
+        args: [isoDaysAgo(daysAgo), key, foods, time],
+      });
     }
   }
 
-  const patientRow = db.prepare('SELECT id FROM patients LIMIT 1').get();
-  if (!patientRow) {
-    const insertPatient = db.prepare(
-      `INSERT INTO patients (id, name, initials, plan, adherence, tone, streak, last_meal_summary, last_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const insertPatientMeal = db.prepare(
-      'INSERT INTO patient_meals (patient_id, meal_key, time, foods) VALUES (?, ?, ?, ?)'
-    );
-
+  const { rows: patientRows } = await db.execute('SELECT id FROM patients LIMIT 1');
+  if (!patientRows.length) {
     const patients = [
       {
         id: 'giulia-ferrari', name: 'Giulia Ferrari', initials: 'GF', plan: 'Metodo Nemis · 16:8',
@@ -141,12 +165,17 @@ function seedIfEmpty() {
     ];
 
     for (const p of patients) {
-      insertPatient.run(p.id, p.name, p.initials, p.plan, p.adherence, p.tone, p.streak, p.lastSummary, p.lastTime);
+      await db.execute({
+        sql: `INSERT INTO patients (id, name, initials, plan, adherence, tone, streak, last_meal_summary, last_time)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [p.id, p.name, p.initials, p.plan, p.adherence, p.tone, p.streak, p.lastSummary, p.lastTime],
+      });
       for (const l of p.log) {
-        insertPatientMeal.run(p.id, l.key, l.time, JSON.stringify(l.foods));
+        await db.execute({
+          sql: 'INSERT INTO patient_meals (patient_id, meal_key, time, foods) VALUES (?, ?, ?, ?)',
+          args: [p.id, l.key, l.time, JSON.stringify(l.foods)],
+        });
       }
     }
   }
 }
-
-seedIfEmpty();

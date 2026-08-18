@@ -10,14 +10,15 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function loadMeals(date: string) {
-  const rows = db
-    .prepare('SELECT meal_key, done, foods, time FROM meals WHERE date = ?')
-    .all(date) as Array<{ meal_key: string; done: number; foods: string; time: string }>;
-  const byKey = new Map(rows.map((r) => [r.meal_key, r]));
+async function loadMeals(date: string) {
+  const { rows } = await db.execute({
+    sql: 'SELECT meal_key, done, foods, time FROM meals WHERE date = ?',
+    args: [date],
+  });
+  const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
   const meals: Record<MealKey, { done: boolean; foods: string[]; time: string }> = {} as any;
   for (const key of ORDER) {
-    const row = byKey.get(key);
+    const row = byKey.get(key) as any;
     meals[key] = row
       ? { done: !!row.done, foods: JSON.parse(row.foods), time: row.time }
       : { done: false, foods: [], time: '' };
@@ -25,10 +26,11 @@ function loadMeals(date: string) {
   return meals;
 }
 
-export function buildState() {
+export async function buildState() {
   const date = todayStr();
-  const appState = db.prepare('SELECT * FROM app_state WHERE id = 1').get() as any;
-  const meals = loadMeals(date);
+  const { rows } = await db.execute('SELECT * FROM app_state WHERE id = 1');
+  const appState = rows[0] as any;
+  const meals = await loadMeals(date);
 
   const doneCount = ORDER.filter((k) => meals[k].done).length;
   const allFoods = ORDER.flatMap((k) => meals[k].foods);
@@ -43,7 +45,7 @@ export function buildState() {
     })
   );
 
-  const streak = computeStreak(date);
+  const streak = await computeStreak(date);
 
   return {
     date,
@@ -56,33 +58,37 @@ export function buildState() {
     doneCount,
     adherencePct: adherence,
     meals: mealsOut,
-    week: computeWeek(date),
-    badges: computeBadges(streak),
+    week: await computeWeek(date),
+    badges: await computeBadges(streak),
   };
 }
 
-stateRouter.get('/state', (_req, res) => {
-  res.json(buildState());
+stateRouter.get('/state', async (_req, res) => {
+  res.json(await buildState());
 });
 
-stateRouter.put('/settings/freq', (req, res) => {
+stateRouter.put('/settings/freq', async (req, res) => {
   const { freq } = req.body ?? {};
   if (!['meal', 'multi', 'day', 'manual'].includes(freq)) {
     return res.status(400).json({ error: 'invalid freq' });
   }
-  db.prepare('UPDATE app_state SET freq = ? WHERE id = 1').run(freq);
-  res.json(buildState());
+  await db.execute({ sql: 'UPDATE app_state SET freq = ? WHERE id = 1', args: [freq] });
+  res.json(await buildState());
 });
 
-stateRouter.post('/fast/toggle', (_req, res) => {
-  const appState = db.prepare('SELECT fast_active, fast_start FROM app_state WHERE id = 1').get() as any;
+stateRouter.post('/fast/toggle', async (_req, res) => {
+  const { rows } = await db.execute('SELECT fast_active, fast_start FROM app_state WHERE id = 1');
+  const appState = rows[0] as any;
   const nowActive = !appState.fast_active;
   const fastStart = nowActive ? Date.now() : appState.fast_start;
-  db.prepare('UPDATE app_state SET fast_active = ?, fast_start = ? WHERE id = 1').run(nowActive ? 1 : 0, fastStart);
-  res.json(buildState());
+  await db.execute({
+    sql: 'UPDATE app_state SET fast_active = ?, fast_start = ? WHERE id = 1',
+    args: [nowActive ? 1 : 0, fastStart],
+  });
+  res.json(await buildState());
 });
 
-stateRouter.post('/meals/:key/log', (req, res) => {
+stateRouter.post('/meals/:key/log', async (req, res) => {
   const { key } = req.params;
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
   const foods: string[] = Array.isArray(req.body?.foods)
@@ -92,13 +98,14 @@ stateRouter.post('/meals/:key/log', (req, res) => {
 
   const date = todayStr();
   const time = new Date().toTimeString().slice(0, 5);
-  db.prepare(
-    `INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 1, ?, ?)
-     ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time`
-  ).run(date, key, JSON.stringify(foods), time);
+  await db.execute({
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 1, ?, ?)
+          ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time`,
+    args: [date, key, JSON.stringify(foods), time],
+  });
 
   const pts = pointsForFoods(foods);
-  db.prepare('UPDATE app_state SET points = points + ? WHERE id = 1').run(pts);
+  await db.execute({ sql: 'UPDATE app_state SET points = points + ? WHERE id = 1', args: [pts] });
 
   const sc = score(foods);
   const summary = {
@@ -109,5 +116,5 @@ stateRouter.post('/meals/:key/log', (req, res) => {
     pointsEarned: pts,
   };
 
-  res.json({ state: buildState(), summary });
+  res.json({ state: await buildState(), summary });
 });

@@ -12,8 +12,9 @@ interface MealRow {
   foods: string;
 }
 
-function allMealRows(): MealRow[] {
-  return db.prepare('SELECT date, meal_key, done, foods FROM meals ORDER BY date DESC').all() as unknown as MealRow[];
+async function allMealRows(): Promise<MealRow[]> {
+  const { rows } = await db.execute('SELECT date, meal_key, done, foods FROM meals ORDER BY date DESC');
+  return rows as unknown as MealRow[];
 }
 
 function toDateKey(d: Date): string {
@@ -23,8 +24,8 @@ function toDateKey(d: Date): string {
 /** Consecutive days (ending today) with at least one meal logged. Today
  * doesn't break the streak if nothing's logged yet — it just doesn't count
  * until something is. */
-export function computeStreak(today: string): number {
-  const rows = allMealRows();
+export async function computeStreak(today: string): Promise<number> {
+  const rows = await allMealRows();
   const doneDates = new Set(rows.filter((r) => r.done).map((r) => r.date));
 
   let streak = 0;
@@ -51,8 +52,8 @@ export interface WeekDay {
 
 /** Last 7 calendar days (oldest → today), with how many meals were
  * completed each day. */
-export function computeWeek(today: string): WeekDay[] {
-  const rows = allMealRows();
+export async function computeWeek(today: string): Promise<WeekDay[]> {
+  const rows = await allMealRows();
   const byDate = new Map<string, number>();
   for (const r of rows) {
     if (!r.done) continue;
@@ -84,8 +85,8 @@ export interface Badge {
   earned: boolean;
 }
 
-export function computeBadges(streak: number): Badge[] {
-  const rows = allMealRows();
+export async function computeBadges(streak: number): Promise<Badge[]> {
+  const rows = await allMealRows();
 
   let goodBreakfasts = 0;
   const goodFoods = new Set<string>();
