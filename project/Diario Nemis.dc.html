@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#E9E3D5;font-family:'Poppins',system-ui,sans-serif;color:#17241C}
+  a{color:#2E8B57;text-decoration:none}
+  a:hover{color:#1C5E41}
+  textarea,input,button{font-family:inherit}
+  textarea:focus,input:focus{outline:none}
+  @keyframes nm-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.7}}
+  @keyframes nm-rec{0%{transform:scaleY(.35)}50%{transform:scaleY(1)}100%{transform:scaleY(.35)}}
+  @keyframes nm-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  @keyframes nm-rise{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @keyframes nm-conf{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(120px) rotate(320deg);opacity:0}}
+  @keyframes nm-sheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:22px 16px">
+<div style="width:100%;max-width:452px;background:#F4F0E6;border-radius:30px;box-shadow:0 24px 60px rgba(23,36,28,.16);overflow:hidden;position:relative;min-height:900px">
+
+  <!-- role switch -->
+  <div style="display:flex;gap:6px;padding:14px 16px 10px;background:#F4F0E6">
+    <button onClick="{{ setPaziente }}" style="{{ pazBtnStyle }}">Paziente</button>
+    <button onClick="{{ setNutri }}" style="{{ nutriBtnStyle }}">Nutrizionista</button>
+  </div>
+
+  <!-- ============ PAZIENTE ============ -->
+  <sc-if value="{{ isPaziente }}" hint-placeholder-val="{{ true }}">
+  <div style="padding-bottom:88px">
+
+    <!-- DIARIO -->
+    <sc-if value="{{ showDiario }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:6px 20px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div>
+          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8A9990;font-weight:600">{{ dateLabel }}</div>
+          <div style="font-size:23px;font-weight:700;line-height:1.15;margin-top:3px">{{ greeting }}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="display:flex;align-items:center;gap:5px;background:#FFF3DC;border:1px solid #F0DCA8;border-radius:999px;padding:6px 11px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#E2A32C"><path d="M12 2c1.3 3-1.8 4.3-1.8 7.2a3.8 3.8 0 007.6 0c0-1.7-.8-2.7-.8-2.7 2 1 3.3 3.2 3.3 6.2A8.3 8.3 0 113.9 9.8c1.8-3.3 6.4-4.6 8.1-7.8z"/></svg>
+            <span style="font-weight:700;font-size:14px;color:#B67B12">{{ streak }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;background:#E7F3EB;border:1px solid #BFE0CC;border-radius:999px;padding:6px 11px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.2"><circle cx="12" cy="12" r="8"/><path d="M9.5 12l1.8 1.8L15 9.5"/></svg>
+            <span style="font-weight:700;font-size:14px;color:#1C5E41">{{ points }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- day ring card -->
+      <div style="background:linear-gradient(150deg,#2E8B57,#1C5E41);border-radius:22px;padding:20px;display:flex;align-items:center;gap:20px;color:#fff;box-shadow:0 12px 26px rgba(28,94,65,.28)">
+        <div style="position:relative;width:112px;height:112px;flex:none">
+          <svg width="112" height="112" viewBox="0 0 112 112" style="transform:rotate(-90deg)">
+            <circle cx="56" cy="56" r="48" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="10"/>
+            <circle cx="56" cy="56" r="48" fill="none" stroke="#F4D06A" stroke-width="10" stroke-linecap="round" strokeDasharray="{{ ringCirc }}" strokeDashoffset="{{ ringOffset }}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <span style="font-size:26px;font-weight:700;line-height:1">{{ doneCount }}/4</span>
+            <span style="font-size:10px;opacity:.85;letter-spacing:.08em">PASTI</span>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:600;line-height:1.3">{{ dayHeadline }}</div>
+          <div style="font-size:13px;opacity:.9;margin-top:5px;line-height:1.4">{{ daySub }}</div>
+          <div style="margin-top:12px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;opacity:.85;margin-bottom:5px"><span>Obiettivo settimana</span><span>{{ weekPct }}</span></div>
+            <div style="height:7px;background:rgba(255,255,255,.24);border-radius:999px;overflow:hidden"><div style="height:100%;background:#F4D06A;border-radius:999px;width:{{ weekPct }}"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- meals -->
+      <div style="margin-top:18px;display:flex;flex-direction:column;gap:11px">
+        <sc-for list="{{ meals }}" as="meal" hint-placeholder-count="4">
+          <button onClick="{{ meal.onOpen }}" style="{{ meal.cardStyle }}">
+            <div style="width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ meal.iconBg }}">
+              <span style="font-size:13px;font-weight:700;color:{{ meal.iconFg }}">{{ meal.short }}</span>
+            </div>
+            <div style="flex:1;text-align:left;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-weight:600;font-size:15px">{{ meal.label }}</span>
+                <span style="font-size:11px;color:#8A9990">{{ meal.time }}</span>
+              </div>
+              <div style="font-size:12.5px;color:#6E7B71;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ meal.preview }}</div>
+            </div>
+            <sc-if value="{{ meal.done }}" hint-placeholder-val="{{ true }}">
+              <span style="{{ meal.badgeStyle }}">{{ meal.scoreLabel }}</span>
+            </sc-if>
+            <sc-if value="{{ meal.todo }}" hint-placeholder-val="{{ true }}">
+              <span style="display:flex;align-items:center;gap:4px;color:#2E8B57;font-weight:600;font-size:13px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              </span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- fasting mini -->
+      <button onClick="{{ goDigiuno }}" style="margin-top:11px;width:100%;background:#17241C;border:none;border-radius:18px;padding:15px 16px;display:flex;align-items:center;gap:13px;cursor:pointer;color:#fff">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4D06A" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>
+        <div style="flex:1;text-align:left">
+          <div style="font-weight:600;font-size:14px">Digiuno intermittente</div>
+          <div style="font-size:12px;color:#B9C6BC">{{ fastMini }}</div>
+        </div>
+        <span style="font-size:15px;font-weight:700;color:#F4D06A">{{ fastPctLabel }}</span>
+      </button>
+
+      <button onClick="{{ openLogQuick }}" style="margin-top:16px;width:100%;background:#2E8B57;border:none;border-radius:16px;padding:16px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 10px 22px rgba(46,139,87,.32);display:flex;align-items:center;justify-content:center;gap:9px">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+        Registra un pasto
+      </button>
+    </div>
+    </sc-if>
+
+    <!-- PREMI -->
+    <sc-if value="{{ showPremi }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:6px 20px 20px">
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">I tuoi progressi</div>
+      <div style="font-size:13px;color:#6E7B71;margin-bottom:16px">Ogni pasto registrato ti avvicina all'obiettivo.</div>
+      <div style="display:flex;gap:11px;margin-bottom:16px">
+        <div style="flex:1;background:#fff;border-radius:18px;padding:15px;text-align:center;border:1px solid rgba(23,36,28,.07)">
+          <div style="font-size:28px;font-weight:700;color:#B67B12">{{ streak }}</div>
+          <div style="font-size:11.5px;color:#6E7B71">giorni di fila</div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:18px;padding:15px;text-align:center;border:1px solid rgba(23,36,28,.07)">
+          <div style="font-size:28px;font-weight:700;color:#1C5E41">{{ points }}</div>
+          <div style="font-size:11.5px;color:#6E7B71">punti totali</div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:18px;padding:15px;text-align:center;border:1px solid rgba(23,36,28,.07)">
+          <div style="font-size:28px;font-weight:700;color:#2E8B57">{{ badgeCount }}</div>
+          <div style="font-size:11.5px;color:#6E7B71">obiettivi</div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border-radius:20px;padding:17px;border:1px solid rgba(23,36,28,.07);margin-bottom:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px">Settimana in corso</div>
+        <div style="display:flex;justify-content:space-between;gap:5px">
+          <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px">
+              <div style="width:100%;height:74px;background:#EFEADD;border-radius:9px;display:flex;align-items:flex-end;overflow:hidden">
+                <div style="width:100%;background:{{ d.color }};height:{{ d.h }};border-radius:9px"></div>
+              </div>
+              <span style="font-size:11px;color:{{ d.labelColor }};font-weight:{{ d.weight }}">{{ d.day }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="font-weight:600;font-size:14px;margin-bottom:11px">Obiettivi</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+        <sc-for list="{{ badges }}" as="b" hint-placeholder-count="4">
+          <div style="{{ b.style }}">
+            <div style="width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:{{ b.iconBg }};margin-bottom:9px">
+              <span style="font-size:20px">{{ b.icon }}</span>
+            </div>
+            <div style="font-weight:600;font-size:13.5px">{{ b.name }}</div>
+            <div style="font-size:11.5px;color:#6E7B71;margin-top:2px;line-height:1.35">{{ b.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- DIGIUNO -->
+    <sc-if value="{{ showDigiuno }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:6px 20px 20px">
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">Digiuno intermittente</div>
+      <div style="font-size:13px;color:#6E7B71;margin-bottom:20px">Protocollo 16:8 · finestra alimentare 8 ore</div>
+      <div style="display:flex;flex-direction:column;align-items:center;background:#17241C;border-radius:24px;padding:30px 20px;color:#fff">
+        <div style="position:relative;width:210px;height:210px">
+          <svg width="210" height="210" viewBox="0 0 210 210" style="transform:rotate(-90deg)">
+            <circle cx="105" cy="105" r="92" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="15"/>
+            <circle cx="105" cy="105" r="92" fill="none" stroke="#F4D06A" stroke-width="15" stroke-linecap="round" strokeDasharray="{{ fastCirc }}" strokeDashoffset="{{ fastOffset }}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <span style="font-size:12px;letter-spacing:.12em;color:#B9C6BC">{{ fastState }}</span>
+            <span style="font-size:38px;font-weight:700;line-height:1.1;margin-top:4px">{{ fastElapsed }}</span>
+            <span style="font-size:12px;color:#B9C6BC;margin-top:2px">obiettivo {{ fastTarget }}</span>
+          </div>
+        </div>
+        <button onClick="{{ toggleFast }}" style="{{ fastBtnStyle }}">{{ fastBtnLabel }}</button>
+      </div>
+      <div style="display:flex;gap:11px;margin-top:14px">
+        <div style="flex:1;background:#fff;border-radius:16px;padding:14px;border:1px solid rgba(23,36,28,.07)">
+          <div style="font-size:11px;color:#6E7B71">Inizio digiuno</div>
+          <div style="font-size:17px;font-weight:600;margin-top:3px">{{ fastStartLabel }}</div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:16px;padding:14px;border:1px solid rgba(23,36,28,.07)">
+          <div style="font-size:11px;color:#6E7B71">Prossimo pasto</div>
+          <div style="font-size:17px;font-weight:600;margin-top:3px">{{ fastEndLabel }}</div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- REPORT -->
+    <sc-if value="{{ showReport }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:6px 20px 20px">
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">Report al nutrizionista</div>
+      <div style="font-size:13px;color:#6E7B71;margin-bottom:18px">Decidi tu quando e come inviare il diario.</div>
+
+      <div style="font-weight:600;font-size:13.5px;margin-bottom:10px">Quando inviare</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:20px">
+        <sc-for list="{{ freqOptions }}" as="f" hint-placeholder-count="4">
+          <button onClick="{{ f.onSelect }}" style="{{ f.style }}">
+            <div style="width:22px;height:22px;border-radius:999px;border:2px solid {{ f.dotBorder }};display:flex;align-items:center;justify-content:center;flex:none">
+              <div style="width:11px;height:11px;border-radius:999px;background:{{ f.dotFill }}"></div>
+            </div>
+            <div style="text-align:left;flex:1">
+              <div style="font-weight:600;font-size:14px">{{ f.label }}</div>
+              <div style="font-size:12px;color:#6E7B71">{{ f.desc }}</div>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="background:#fff;border-radius:20px;border:1px solid rgba(23,36,28,.07);overflow:hidden;margin-bottom:18px">
+        <div style="padding:15px 17px;border-bottom:1px solid rgba(23,36,28,.07);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:600;font-size:14px">Anteprima report · oggi</div>
+          <span style="font-size:11px;color:#2E8B57;background:#E7F3EB;padding:3px 9px;border-radius:999px;font-weight:600">{{ doneCount }} pasti</span>
+        </div>
+        <div style="padding:8px 17px 14px">
+          <sc-for list="{{ reportMeals }}" as="rm" hint-placeholder-count="2">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(23,36,28,.05)">
+              <div><span style="font-weight:600;font-size:13.5px">{{ rm.label }}</span> <span style="font-size:12px;color:#8A9990">· {{ rm.foods }}</span></div>
+              <span style="{{ rm.badgeStyle }}">{{ rm.scoreLabel }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex;justify-content:space-between;padding:11px 0 3px;font-size:13px"><span style="color:#6E7B71">Aderenza giornata</span><span style="font-weight:700;color:#2E8B57">{{ adherence }}</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:11px">
+        <button onClick="{{ exportPdf }}" style="flex:1;background:#fff;border:1.5px solid #2E8B57;color:#1C5E41;border-radius:14px;padding:14px;font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2v5h5M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><path d="M9 13h6M9 17h4"/></svg>
+          Esporta PDF
+        </button>
+        <button onClick="{{ sendWhats }}" style="flex:1;background:#25D366;border:none;color:#fff;border-radius:14px;padding:14px;font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 18px rgba(37,211,102,.3)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 00-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1012 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 .9-2.2c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.2.1.4 0 .5-.1l.7-.8c.2-.2.4-.2.6-.1l1.7.8c.2.1.4.2.5.3.1.2.1.9-.2 1.5z"/></svg>
+          WhatsApp
+        </button>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- bottom nav -->
+    <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(244,240,230,.94);backdrop-filter:blur(10px);border-top:1px solid rgba(23,36,28,.08);display:flex;padding:10px 8px 14px">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.onClick }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ n.color }}">
+          <span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center" dangerouslySetInnerHTML="{{ n.icon }}"></span>
+          <span style="font-size:10.5px;font-weight:{{ n.weight }}">{{ n.label }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ NUTRIZIONISTA ============ -->
+  <sc-if value="{{ isNutri }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:6px 20px 24px;min-height:820px">
+    <sc-if value="{{ nutriList }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:3px">Pazienti oggi</div>
+      <div style="font-size:13px;color:#6E7B71;margin-bottom:16px">Report ricevuti in tempo reale dal diario.</div>
+      <div style="display:flex;gap:9px;margin-bottom:16px">
+        <div style="flex:1;background:#2E8B57;color:#fff;border-radius:16px;padding:14px"><div style="font-size:26px;font-weight:700">18</div><div style="font-size:11.5px;opacity:.9">report oggi</div></div>
+        <div style="flex:1;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:16px;padding:14px"><div style="font-size:26px;font-weight:700;color:#B67B12">3</div><div style="font-size:11.5px;color:#6E7B71">da ricontattare</div></div>
+        <div style="flex:1;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:16px;padding:14px"><div style="font-size:26px;font-weight:700;color:#1C5E41">84%</div><div style="font-size:11.5px;color:#6E7B71">aderenza media</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ patients }}" as="p" hint-placeholder-count="4">
+          <button onClick="{{ p.onOpen }}" style="display:flex;align-items:center;gap:13px;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:16px;padding:13px 15px;cursor:pointer;text-align:left">
+            <div style="width:44px;height:44px;border-radius:999px;background:{{ p.avBg }};color:{{ p.avFg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none">{{ p.initials }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:14.5px">{{ p.name }}</div>
+              <div style="font-size:12px;color:#6E7B71;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.last }}</div>
+            </div>
+            <div style="text-align:right;flex:none">
+              <div style="{{ p.badgeStyle }}">{{ p.adherence }}</div>
+              <div style="font-size:11px;color:#8A9990;margin-top:3px">{{ p.time }}</div>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ nutriDetail }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <button onClick="{{ backToList }}" style="background:none;border:none;color:#2E8B57;font-weight:600;font-size:13.5px;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;margin-bottom:14px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>Tutti i pazienti
+      </button>
+      <div style="display:flex;align-items:center;gap:13px;margin-bottom:16px">
+        <div style="width:56px;height:56px;border-radius:999px;background:{{ activePatient.avBg }};color:{{ activePatient.avFg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;flex:none">{{ activePatient.initials }}</div>
+        <div>
+          <div style="font-size:19px;font-weight:700">{{ activePatient.name }}</div>
+          <div style="font-size:12.5px;color:#6E7B71">{{ activePatient.plan }}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;margin-bottom:16px">
+        <div style="flex:1;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:14px;padding:12px;text-align:center"><div style="font-size:21px;font-weight:700;color:#2E8B57">{{ activePatient.adherence }}</div><div style="font-size:11px;color:#6E7B71">aderenza</div></div>
+        <div style="flex:1;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:14px;padding:12px;text-align:center"><div style="font-size:21px;font-weight:700;color:#B67B12">{{ activePatient.streak }}</div><div style="font-size:11px;color:#6E7B71">giorni</div></div>
+        <div style="flex:1;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:14px;padding:12px;text-align:center"><div style="font-size:21px;font-weight:700;color:#1C5E41">{{ activePatient.meals }}</div><div style="font-size:11px;color:#6E7B71">pasti/oggi</div></div>
+      </div>
+      <div style="font-weight:600;font-size:14px;margin-bottom:10px">Diario di oggi</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+        <sc-for list="{{ activePatient.log }}" as="l" hint-placeholder-count="3">
+          <div style="background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:16px;padding:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-weight:600;font-size:14px">{{ l.label }}</span><span style="font-size:11px;color:#8A9990">{{ l.time }}</span></div>
+              <span style="{{ l.badgeStyle }}">{{ l.scoreLabel }}</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ l.foods }}" as="fd" hint-placeholder-count="3">
+                <span style="{{ fd.chip }}">{{ fd.icon }} {{ fd.name }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <button onClick="{{ exportPdf }}" style="width:100%;background:#17241C;border:none;color:#fff;border-radius:14px;padding:14px;font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F4D06A" stroke-width="2"><path d="M14 2v5h5M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/></svg>
+        Scarica PDF del diario
+      </button>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- ============ LOG SHEET ============ -->
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;inset:0;z-index:40">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(23,36,28,.42)"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:#F4F0E6;border-radius:26px 26px 0 0;padding:18px 20px 26px;animation:nm-sheet .28s ease;max-height:94%;overflow:auto">
+      <div style="width:40px;height:4px;background:rgba(23,36,28,.18);border-radius:9px;margin:0 auto 16px"></div>
+      <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A9990;font-weight:600">Registra</div>
+      <div style="display:flex;gap:7px;margin:8px 0 16px;flex-wrap:wrap">
+        <sc-for list="{{ mealChips }}" as="mc" hint-placeholder-count="4">
+          <button onClick="{{ mc.onClick }}" style="{{ mc.style }}">{{ mc.label }}</button>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;background:#EFEADD;border-radius:13px;padding:4px;margin-bottom:16px">
+        <sc-for list="{{ modeTabs }}" as="mt" hint-placeholder-count="3">
+          <button onClick="{{ mt.onClick }}" style="{{ mt.style }}">
+            <span dangerouslySetInnerHTML="{{ mt.icon }}" style="display:flex"></span>{{ mt.label }}
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- testo -->
+      <sc-if value="{{ modeText }}" hint-placeholder-val="{{ true }}">
+      <textarea value="{{ logText }}" onChange="{{ onLogText }}" placeholder="Es. Yogurt greco, mirtilli, un cucchiaino di miele..." style="width:100%;min-height:110px;border:1.5px solid rgba(23,36,28,.12);border-radius:14px;padding:14px;font-size:14.5px;resize:none;background:#fff;color:#17241C;line-height:1.5"></textarea>
+      <div style="font-size:12px;color:#8A9990;margin-top:8px">Separa gli alimenti con una virgola. Faremo il match con il piano consigliato.</div>
+      </sc-if>
+
+      <!-- audio -->
+      <sc-if value="{{ modeAudio }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#fff;border:1.5px solid rgba(23,36,28,.12);border-radius:16px;padding:22px;text-align:center">
+        <button onClick="{{ toggleRec }}" style="{{ recBtnStyle }}">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 18v3" stroke="#fff" stroke-width="2"/></svg>
+        </button>
+        <div style="display:flex;align-items:center;justify-content:center;gap:3px;height:34px;margin:16px 0 6px">
+          <sc-for list="{{ waveBars }}" as="w" hint-placeholder-count="9">
+            <span style="width:4px;height:26px;background:{{ w.color }};border-radius:9px;transform-origin:center;animation:{{ w.anim }}"></span>
+          </sc-for>
+        </div>
+        <div style="font-size:13.5px;font-weight:600;color:#17241C">{{ recLabel }}</div>
+        <sc-if value="{{ hasTranscript }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;background:#F4F0E6;border-radius:12px;padding:12px;text-align:left;font-size:13.5px;color:#17241C;line-height:1.5;animation:nm-rise .3s ease">"{{ logText }}"</div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <!-- foto -->
+      <sc-if value="{{ modePhoto }}" hint-placeholder-val="{{ true }}">
+      <sc-if value="{{ photoAdded }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff;border:1.5px solid rgba(23,36,28,.12);border-radius:16px;overflow:hidden;animation:nm-rise .3s ease">
+          <div style="height:130px;background:linear-gradient(135deg,#D9E7DD,#EFE7CF);display:flex;align-items:center;justify-content:center;color:#8A9990;font-size:13px">Foto del pasto</div>
+          <div style="padding:13px">
+            <div style="font-size:12px;color:#8A9990;font-weight:600;margin-bottom:8px">RICONOSCIUTO NELLA FOTO</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ photoItems }}" as="pi" hint-placeholder-count="3">
+                <span style="{{ pi.chip }}">{{ pi.icon }} {{ pi.name }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noPhoto }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ addPhoto }}" style="width:100%;background:#fff;border:1.5px dashed rgba(23,36,28,.22);border-radius:16px;padding:30px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:11px">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="1.8"><path d="M3 9a2 2 0 012-2h1.5l1-2h5l1 2H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          <div style="font-weight:600;font-size:14px;color:#17241C">Scatta o carica una foto</div>
+          <div style="font-size:12px;color:#8A9990">Riconosciamo gli alimenti automaticamente</div>
+        </button>
+      </sc-if>
+      </sc-if>
+
+      <button onClick="{{ submitLog }}" style="margin-top:16px;width:100%;background:#2E8B57;border:none;border-radius:14px;padding:15px;color:#fff;font-size:15px;font-weight:600;cursor:pointer">Analizza pasto</button>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ SUMMARY ============ -->
+  <sc-if value="{{ summaryOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;inset:0;z-index:50;background:#F4F0E6;overflow:auto;animation:nm-rise .3s ease">
+    <div style="{{ summaryHeadStyle }}">
+      <div style="position:relative;height:56px">
+        <sc-for list="{{ confetti }}" as="c" hint-placeholder-count="0">
+          <span style="{{ c.style }}"></span>
+        </sc-for>
+      </div>
+      <div style="width:66px;height:66px;border-radius:999px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;margin:0 auto;animation:nm-pop .4s ease">
+        <span style="font-size:32px">{{ summaryEmoji }}</span>
+      </div>
+      <div style="text-align:center;color:#fff;margin-top:14px">
+        <div style="font-size:24px;font-weight:700">{{ summaryTitle }}</div>
+        <div style="font-size:14px;opacity:.92;margin-top:4px">{{ summarySub }}</div>
+        <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.2);border-radius:999px;padding:7px 15px;margin-top:14px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#F4D06A"><path d="M12 2l3 6.3 6.9.9-5 4.8 1.2 6.9L12 17.6 5.9 20.9 7 14 2 9.2l6.9-.9z"/></svg>
+          <span style="font-weight:700;font-size:15px;color:#fff">+{{ summaryPoints }} punti</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:5px">{{ summaryMealLabel }}</div>
+      <div style="font-size:12.5px;color:#6E7B71;margin-bottom:13px">Match con il tuo piano Nemis consigliato</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ summaryFoods }}" as="sf" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:14px;padding:13px 15px">
+            <div style="width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:{{ sf.bg }};flex:none"><span dangerouslySetInnerHTML="{{ sf.icon }}" style="display:flex"></span></div>
+            <div style="flex:1"><div style="font-weight:600;font-size:14px">{{ sf.name }}</div><div style="font-size:12px;color:{{ sf.fg }};font-weight:600">{{ sf.verdict }}</div></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:11px;margin-top:20px">
+        <button onClick="{{ closeSummary }}" style="flex:1;background:#fff;border:1.5px solid rgba(23,36,28,.14);color:#17241C;border-radius:14px;padding:14px;font-weight:600;font-size:14px;cursor:pointer">Chiudi</button>
+        <button onClick="{{ sendFromSummary }}" style="flex:1.4;background:#2E8B57;border:none;color:#fff;border-radius:14px;padding:14px;font-weight:600;font-size:14px;cursor:pointer">Invia al nutrizionista</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- toast -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;left:50%;bottom:104px;transform:translateX(-50%);z-index:80;background:#17241C;color:#fff;padding:12px 18px;border-radius:999px;font-size:13.5px;font-weight:500;box-shadow:0 10px 26px rgba(23,36,28,.3);animation:nm-rise .3s ease;display:flex;align-items:center;gap:8px;white-space:nowrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F4D06A" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>{{ toast }}
+  </div>
+  </sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:452,&quot;height&quot;:920}}">
+class Component extends DCLogic {
+  state = {
+    role: 'paziente', tab: 'diario',
+    sheetOpen: false, summaryOpen: false,
+    activeMeal: 'pranzo', mode: 'text', logText: '', recording: false, hasTranscript: false, photoAdded: false,
+    points: 320, streak: 12, freq: 'day',
+    fastActive: true, fastStart: Date.now() - (14 * 3600 + 20 * 60) * 1000,
+    toast: '', lastMeal: null, lastPoints: 0, activePatient: null,
+    meals: {
+      colazione: { done: true, foods: ['Yogurt greco', 'Mirtilli', 'Fiocchi di avena', 'Miele'], time: '08:10' },
+      pranzo: { done: false, foods: [], time: '13:30' },
+      cena: { done: false, foods: [], time: '20:00' },
+      spuntino: { done: false, foods: [], time: '16:30' },
+    },
+  };
+  CONSIGLIATI = ['yogurt', 'avena', 'fiocchi', 'mirtilli', 'frutti di bosco', 'pesce', 'salmone', 'verdura', 'insalata', 'spinaci', 'pollo', 'tacchino', 'uova', 'frutta secca', 'noci', 'mandorle', 'riso integrale', 'quinoa', 'lenticchie', 'ceci', 'legumi', 'olio evo', 'acqua', 'the verde', 'frutta', 'mela', 'banana', 'broccoli', 'zucchine'];
+  SCONSIGLIATI = ['zucchero', 'dolce', 'dolci', 'fritto', 'fritti', 'patatine', 'bibita', 'cola', 'pizza', 'pane bianco', 'merendina', 'biscotti', 'alcol', 'birra', 'vino', 'gelato', 'nutella', 'cornetto', 'brioche', 'salsiccia', 'insaccati'];
+  ORDER = ['colazione', 'pranzo', 'cena', 'spuntino'];
+  SHORT = { colazione: 'COL', pranzo: 'PRA', cena: 'CEN', spuntino: 'SPU' };
+  LABEL = { colazione: 'Colazione', pranzo: 'Pranzo', cena: 'Cena', spuntino: 'Spuntino' };
+
+  componentDidMount() { this._t = setInterval(() => { if (this.state.fastActive) this.forceUpdate(); }, 1000); }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  verdict(name) {
+    const n = name.toLowerCase().trim();
+    if (this.SCONSIGLIATI.some(w => n.includes(w))) return 'bad';
+    if (this.CONSIGLIATI.some(w => n.includes(w))) return 'good';
+    return 'ok';
+  }
+  vColor(v) { return v === 'good' ? '#2E8B57' : v === 'ok' ? '#B67B12' : '#D06A3C'; }
+  vBg(v) { return v === 'good' ? '#E7F3EB' : v === 'ok' ? '#FFF3DC' : '#FBE7DE'; }
+  vLabel(v) { return v === 'good' ? 'Consigliato dal piano' : v === 'ok' ? 'Consentito con moderazione' : 'Da limitare'; }
+  vIcon(v) {
+    const c = this.vColor(v);
+    if (v === 'good') return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
+    if (v === 'ok') return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.6"><path d="M5 12h14"/></svg>`;
+    return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+  }
+  score(foods) {
+    if (!foods.length) return { label: '—', tone: 'ok' };
+    const vs = foods.map(f => this.verdict(f));
+    const bad = vs.filter(v => v === 'bad').length;
+    const good = vs.filter(v => v === 'good').length;
+    if (bad === 0 && good >= 1) return { label: 'Buona scelta', tone: 'good' };
+    if (bad >= 2) return { label: 'Da rivedere', tone: 'bad' };
+    return { label: 'Nel complesso ok', tone: 'ok' };
+  }
+  badge(tone, extra) {
+    const map = { good: ['#E7F3EB', '#1C5E41'], ok: ['#FFF3DC', '#B67B12'], bad: ['#FBE7DE', '#C0502A'] };
+    const [bg, fg] = map[tone] || map.ok;
+    return `display:inline-block;background:${bg};color:${fg};font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;${extra || ''}`;
+  }
+  toast(msg) { this.setState({ toast: msg }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: '' }), 2600); }
+
+  renderVals() {
+    const s = this.state;
+    const isPaziente = s.role === 'paziente';
+    const doneCount = this.ORDER.filter(k => s.meals[k].done).length;
+    const ringCirc = 2 * Math.PI * 48;
+    const ringOffset = ringCirc * (1 - doneCount / 4);
+
+    // fasting live
+    const el = Math.max(0, Date.now() - s.fastStart);
+    const h = Math.floor(el / 3600000), m = Math.floor((el % 3600000) / 60000), sec = Math.floor((el % 60000) / 1000);
+    const fastPct = Math.min(1, el / (16 * 3600000));
+    const fastCirc = 2 * Math.PI * 92;
+    const startD = new Date(s.fastStart);
+    const endD = new Date(s.fastStart + 16 * 3600000);
+    const fmt = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+
+    const meals = this.ORDER.map(k => {
+      const md = s.meals[k];
+      const sc = this.score(md.foods);
+      return {
+        key: k, label: this.LABEL[k], short: this.SHORT[k], time: md.time, done: md.done, todo: !md.done,
+        preview: md.done ? md.foods.join(', ') : 'Tocca per registrare',
+        scoreLabel: sc.label, badgeStyle: this.badge(sc.tone),
+        iconBg: md.done ? '#E7F3EB' : '#EFEADD', iconFg: md.done ? '#1C5E41' : '#8A9990',
+        cardStyle: `display:flex;align-items:center;gap:13px;width:100%;background:#fff;border:1px solid rgba(23,36,28,.07);border-radius:16px;padding:12px 14px;cursor:pointer;text-align:left`,
+        onOpen: () => this.setState({ sheetOpen: true, activeMeal: k, mode: 'text', logText: md.done ? md.foods.join(', ') : '', recording: false, hasTranscript: md.done, photoAdded: false }),
+      };
+    });
+
+    // rewards week
+    const dayNames = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+    const heights = ['80%', '55%', '95%', '70%', '88%', '40%', '18%'];
+    const todayIdx = 4;
+    const weekDays = dayNames.map((d, i) => ({
+      day: d, h: heights[i],
+      color: i > todayIdx ? '#EFEADD' : (i === todayIdx ? '#F4D06A' : '#2E8B57'),
+      labelColor: i === todayIdx ? '#17241C' : '#8A9990', weight: i === todayIdx ? '700' : '500',
+    }));
+    const badges = [
+      { name: 'Prima settimana', desc: '7 giorni consecutivi', icon: '🌱', earned: true },
+      { name: 'Colazione top', desc: '10 colazioni consigliate', icon: '☀️', earned: true },
+      { name: 'Idratazione', desc: '2L al giorno x5', icon: '💧', earned: true },
+      { name: 'Costanza', desc: '30 giorni · in corso', icon: '🏆', earned: false },
+    ].map(b => ({
+      ...b,
+      style: `background:${b.earned ? '#fff' : '#EFEADD'};border:1px solid rgba(23,36,28,.07);border-radius:18px;padding:15px;${b.earned ? '' : 'opacity:.6'}`,
+      iconBg: b.earned ? '#FFF3DC' : 'rgba(23,36,28,.06)',
+    }));
+
+    // report meals / adherence
+    const reportMeals = this.ORDER.filter(k => s.meals[k].done).map(k => {
+      const sc = this.score(s.meals[k].foods);
+      return { label: this.LABEL[k], foods: s.meals[k].foods.slice(0, 3).join(', '), scoreLabel: sc.label, badgeStyle: this.badge(sc.tone) };
+    });
+    const allFoods = this.ORDER.flatMap(k => s.meals[k].foods);
+    const goodPct = allFoods.length ? Math.round(allFoods.filter(f => this.verdict(f) === 'good').length / allFoods.length * 100) : 0;
+    const adherence = goodPct + '%';
+
+    const FREQ = [
+      { key: 'meal', label: 'Ad ogni pasto', desc: 'Invio automatico dopo ogni registrazione' },
+      { key: 'multi', label: 'Più pasti insieme', desc: 'Raggruppa e invia 2-3 volte al giorno' },
+      { key: 'day', label: 'Una volta al giorno', desc: 'Riepilogo serale completo, ore 21:00' },
+      { key: 'manual', label: 'Solo manuale', desc: 'Invii tu quando vuoi' },
+    ];
+    const freqOptions = FREQ.map(f => {
+      const on = s.freq === f.key;
+      return {
+        ...f, dotBorder: on ? '#2E8B57' : 'rgba(23,36,28,.2)', dotFill: on ? '#2E8B57' : 'transparent',
+        style: `display:flex;align-items:center;gap:12px;width:100%;background:${on ? '#E7F3EB' : '#fff'};border:1.5px solid ${on ? '#2E8B57' : 'rgba(23,36,28,.09)'};border-radius:14px;padding:13px 15px;cursor:pointer`,
+        onSelect: () => this.setState({ freq: f.key }),
+      };
+    });
+
+    // nav
+    const navDef = [
+      { key: 'diario', label: 'Diario', p: 'M4 5a2 2 0 012-2h12v18H6a2 2 0 01-2-2zM8 3v18' },
+      { key: 'premi', label: 'Premi', p: 'M12 2l3 6.3 6.9.9-5 4.8 1.2 6.9L12 17.6 5.9 20.9 7 14 2 9.2l6.9-.9z' },
+      { key: 'digiuno', label: 'Digiuno', p: 'M12 5v7l4 2' },
+      { key: 'report', label: 'Report', p: 'M22 2L11 13M22 2l-7 20-4-9-9-4z' },
+    ];
+    const navItems = navDef.map(n => {
+      const on = s.tab === n.key;
+      const col = on ? '#2E8B57' : '#8A9990';
+      const icon = n.key === 'digiuno'
+        ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="${n.p}"/></svg>`
+        : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2"><path d="${n.p}"/></svg>`;
+      return { label: n.label, color: col, weight: on ? '700' : '500', icon: { __html: icon }, onClick: () => this.setState({ tab: n.key }) };
+    });
+
+    // sheet meal chips
+    const mealChips = this.ORDER.map(k => {
+      const on = s.activeMeal === k;
+      return { label: this.LABEL[k], onClick: () => this.setState({ activeMeal: k }),
+        style: `background:${on ? '#2E8B57' : '#fff'};color:${on ? '#fff' : '#17241C'};border:1.5px solid ${on ? '#2E8B57' : 'rgba(23,36,28,.1)'};border-radius:999px;padding:8px 15px;font-size:13px;font-weight:600;cursor:pointer` };
+    });
+    const modeDef = [
+      { key: 'text', label: 'Testo', ic: '<path d="M4 6h16M4 12h16M4 18h10"/>' },
+      { key: 'audio', label: 'Audio', ic: '<path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/>' },
+      { key: 'photo', label: 'Foto', ic: '<path d="M3 9a2 2 0 012-2h1.5l1-2h5l1 2H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.5"/>' },
+    ];
+    const modeTabs = modeDef.map(md => {
+      const on = s.mode === md.key;
+      const col = on ? '#1C5E41' : '#8A9990';
+      return { label: md.label, onClick: () => this.setState({ mode: md.key }),
+        icon: { __html: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2">${md.ic}</svg>` },
+        style: `flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:${on ? '#fff' : 'transparent'};color:${col};border:none;border-radius:10px;padding:10px;font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:${on ? '0 2px 6px rgba(23,36,28,.08)' : 'none'}` };
+    });
+    const waveBars = Array.from({ length: 11 }, (_, i) => ({
+      color: s.recording ? '#2E8B57' : 'rgba(23,36,28,.18)',
+      anim: s.recording ? `nm-rec ${0.5 + (i % 4) * 0.18}s ease-in-out ${i * 0.05}s infinite` : 'none',
+    }));
+    const photoDefItems = ['Petto di pollo', 'Insalata mista', 'Riso integrale', 'Olio evo'];
+    const photoItems = (s.photoAdded ? photoDefItems : []).map(n => {
+      const v = this.verdict(n);
+      return { name: n, icon: v === 'good' ? '✓' : v === 'ok' ? '~' : '✕',
+        chip: `background:${this.vBg(v)};color:${this.vColor(v)};font-size:12px;font-weight:600;padding:5px 10px;border-radius:9px` };
+    });
+
+    // summary
+    const lm = s.lastMeal;
+    const summaryFoods = lm ? lm.foods.map(f => {
+      const v = this.verdict(f);
+      return { name: f, verdict: this.vLabel(v), icon: { __html: this.vIcon(v) }, bg: this.vBg(v), fg: this.vColor(v) };
+    }) : [];
+    const lmScore = lm ? this.score(lm.foods) : { tone: 'good', label: '' };
+    const goodMeal = lmScore.tone === 'good';
+    const summaryHeadStyle = `background:linear-gradient(150deg,${goodMeal ? '#2E8B57,#1C5E41' : (lmScore.tone === 'bad' ? '#C0502A,#8f3a1c' : '#B67B12,#8a5c0d')});padding:20px 20px 26px`;
+    const confetti = goodMeal ? Array.from({ length: 14 }, (_, i) => ({
+      style: `position:absolute;top:20px;left:${6 + i * 6.6}%;width:7px;height:11px;background:${['#F4D06A', '#fff', '#BFE0CC'][i % 3]};border-radius:2px;animation:nm-conf ${0.9 + (i % 5) * 0.15}s ease-out ${(i % 4) * 0.08}s forwards`,
+    })) : [];
+
+    // nutritionist
+    const PAT = [
+      { name: 'Giulia Ferrari', initials: 'GF', adherence: '92%', tone: 'good', last: 'Pranzo · Salmone, quinoa, spinaci', time: '13:42', streak: 21, meals: '3', plan: 'Metodo Nemis · 16:8',
+        log: [ { label: 'Colazione', time: '08:05', foods: ['Yogurt greco', 'Mirtilli', 'Avena'] }, { label: 'Pranzo', time: '13:42', foods: ['Salmone', 'Quinoa', 'Spinaci'] } ] },
+      { name: 'Marco Bianchi', initials: 'MB', adherence: '61%', tone: 'ok', last: 'Cena · Pizza, birra', time: '20:15', streak: 6, meals: '3', plan: 'Metodo Nemis · standard',
+        log: [ { label: 'Pranzo', time: '13:10', foods: ['Pollo', 'Insalata'] }, { label: 'Cena', time: '20:15', foods: ['Pizza', 'Birra'] } ] },
+      { name: 'Elena Russo', initials: 'ER', adherence: '78%', tone: 'good', last: 'Spuntino · Mandorle', time: '16:30', streak: 14, meals: '2', plan: 'Metodo Nemis · Flobutir',
+        log: [ { label: 'Colazione', time: '07:50', foods: ['Uova', 'Frutta secca'] }, { label: 'Spuntino', time: '16:30', foods: ['Mandorle', 'Mela'] } ] },
+      { name: 'Luca Conti', initials: 'LC', adherence: '44%', tone: 'bad', last: 'Non registra da 2 giorni', time: '—', streak: 0, meals: '0', plan: 'Metodo Nemis · standard', log: [] },
+    ].map(p => {
+      const decorated = { ...p, avBg: this.vBg(p.tone), avFg: this.vColor(p.tone),
+        badgeStyle: this.badge(p.tone, 'display:inline-block'),
+        log: p.log.map(l => {
+          const sc = this.score(l.foods);
+          return { ...l, scoreLabel: sc.label, badgeStyle: this.badge(sc.tone, 'display:inline-block'),
+            foods: l.foods.map(f => { const v = this.verdict(f); return { name: f, icon: v === 'good' ? '✓' : v === 'ok' ? '~' : '✕', chip: `background:${this.vBg(v)};color:${this.vColor(v)};font-size:12px;font-weight:600;padding:5px 10px;border-radius:9px` }; }) };
+        }) };
+      decorated.onOpen = () => this.setState({ activePatient: decorated });
+      return decorated;
+    });
+
+    return {
+      isPaziente, isNutri: !isPaziente,
+      showDiario: isPaziente && s.tab === 'diario', showPremi: isPaziente && s.tab === 'premi',
+      showDigiuno: isPaziente && s.tab === 'digiuno', showReport: isPaziente && s.tab === 'report',
+      setPaziente: () => this.setState({ role: 'paziente' }), setNutri: () => this.setState({ role: 'nutrizionista', activePatient: null }),
+      pazBtnStyle: `flex:1;padding:9px;border-radius:11px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:${isPaziente ? '#17241C' : 'rgba(23,36,28,.06)'};color:${isPaziente ? '#fff' : '#6E7B71'}`,
+      nutriBtnStyle: `flex:1;padding:9px;border-radius:11px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:${!isPaziente ? '#17241C' : 'rgba(23,36,28,.06)'};color:${!isPaziente ? '#fff' : '#6E7B71'}`,
+
+      dateLabel: 'Giovedì 17 Aprile', greeting: 'Ciao Sofia 👋',
+      streak: s.streak, points: s.points,
+      ringCirc, ringOffset, doneCount,
+      dayHeadline: doneCount >= 3 ? 'Giornata quasi completa!' : 'Buon lavoro finora',
+      daySub: doneCount >= 3 ? 'Ti manca poco per il bonus di oggi.' : 'Registra i prossimi pasti per guadagnare punti.',
+      weekPct: '68%',
+      fastMini: s.fastActive ? `In corso · ${h}h ${String(m).padStart(2, '0')}m` : 'Non attivo',
+      fastPctLabel: Math.round(fastPct * 100) + '%',
+      goDigiuno: () => this.setState({ tab: 'digiuno' }),
+      openLogQuick: () => this.setState({ sheetOpen: true, activeMeal: this.ORDER.find(k => !s.meals[k].done) || 'spuntino', mode: 'text', logText: '', hasTranscript: false, photoAdded: false, recording: false }),
+      meals, navItems,
+
+      // premi
+      badgeCount: 3, weekDays, badges,
+
+      // digiuno
+      fastCirc, fastOffset: fastCirc * (1 - fastPct),
+      fastState: s.fastActive ? 'DIGIUNO IN CORSO' : 'FINESTRA APERTA',
+      fastElapsed: `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`,
+      fastTarget: '16:00', fastStartLabel: fmt(startD), fastEndLabel: fmt(endD),
+      toggleFast: () => this.setState(st => ({ fastActive: !st.fastActive, fastStart: st.fastActive ? st.fastStart : Date.now() })),
+      fastBtnLabel: s.fastActive ? 'Termina digiuno' : 'Inizia digiuno',
+      fastBtnStyle: `margin-top:22px;background:${s.fastActive ? 'rgba(255,255,255,.16)' : '#F4D06A'};color:${s.fastActive ? '#fff' : '#17241C'};border:none;border-radius:13px;padding:14px 34px;font-weight:600;font-size:14px;cursor:pointer`,
+
+      // report
+      freqOptions, reportMeals, adherence,
+      exportPdf: () => this.toast('PDF del diario generato'),
+      sendWhats: () => this.toast('Report inviato su WhatsApp'),
+
+      // sheet
+      sheetOpen: s.sheetOpen, closeSheet: () => this.setState({ sheetOpen: false }),
+      mealChips, modeTabs,
+      modeText: s.mode === 'text', modeAudio: s.mode === 'audio', modePhoto: s.mode === 'photo',
+      logText: s.logText, onLogText: e => this.setState({ logText: e.target.value }),
+      toggleRec: () => {
+        if (s.recording) this.setState({ recording: false, hasTranscript: true, logText: s.logText || 'Petto di pollo alla griglia, insalata mista con olio evo e riso integrale' });
+        else this.setState({ recording: true, hasTranscript: false });
+      },
+      recording: s.recording, hasTranscript: s.hasTranscript,
+      recLabel: s.recording ? 'Sto ascoltando... tocca per fermare' : (s.hasTranscript ? 'Trascrizione pronta' : 'Tocca il microfono per parlare'),
+      recBtnStyle: `width:64px;height:64px;border-radius:999px;border:none;cursor:pointer;background:${s.recording ? '#D06A3C' : '#2E8B57'};display:flex;align-items:center;justify-content:center;margin:0 auto;${s.recording ? 'animation:nm-pulse 1.1s ease-in-out infinite' : ''}`,
+      waveBars,
+      photoAdded: s.photoAdded, noPhoto: !s.photoAdded, photoItems,
+      addPhoto: () => this.setState({ photoAdded: true }),
+
+      submitLog: () => {
+        let foods;
+        if (s.mode === 'photo' && s.photoAdded) foods = ['Petto di pollo', 'Insalata mista', 'Riso integrale', 'Olio evo'];
+        else foods = (s.logText || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+        if (!foods.length) foods = ['Yogurt greco', 'Mirtilli', 'Avena'];
+        const sc = this.score(foods);
+        const pts = foods.reduce((a, f) => a + (this.verdict(f) === 'good' ? 15 : this.verdict(f) === 'ok' ? 8 : 3), 0);
+        const key = s.activeMeal;
+        this.setState(st => ({
+          meals: { ...st.meals, [key]: { ...st.meals[key], done: true, foods } },
+          points: st.points + pts, sheetOpen: false, summaryOpen: true,
+          lastMeal: { key, label: this.LABEL[key], foods, score: sc }, lastPoints: pts,
+        }));
+      },
+
+      // summary
+      summaryOpen: s.summaryOpen,
+      summaryHeadStyle, confetti,
+      summaryEmoji: goodMeal ? '🎉' : lmScore.tone === 'bad' ? '💪' : '👍',
+      summaryTitle: lm ? lmScore.label + '!' : '',
+      summarySub: goodMeal ? 'Ottimo, in linea con il tuo piano Nemis.' : lmScore.tone === 'bad' ? 'Domani riprendiamo con scelte migliori.' : 'Buono! Puoi migliorare ancora un po\u2019.',
+      summaryPoints: s.lastPoints, summaryMealLabel: lm ? lm.label : '', summaryFoods,
+      closeSummary: () => this.setState({ summaryOpen: false }),
+      sendFromSummary: () => { this.setState({ summaryOpen: false }); this.toast('Pasto inviato al nutrizionista'); },
+
+      // nutritionist
+      nutriList: !isPaziente && !s.activePatient, nutriDetail: !isPaziente && !!s.activePatient,
+      patients: PAT, activePatient: s.activePatient,
+      backToList: () => this.setState({ activePatient: null }),
+
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

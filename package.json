@@ -1,0 +1,17 @@
+{
+  "name": "diario-nemis",
+  "version": "1.0.0",
+  "description": "Diario Nemis — tracciamento nutrizionale gamificato",
+  "scripts": {
+    "test": "npm run test --prefix server",
+    "dev": "concurrently -n server,app -c blue,green \"npm:dev --prefix server\" \"npm:dev --prefix app\"",
+    "install:all": "npm install --prefix server && npm install --prefix app"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

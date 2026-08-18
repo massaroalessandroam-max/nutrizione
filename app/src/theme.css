@@ -1,0 +1,68 @@
+/*
+  Design tokens for Diario Nemis.
+
+  The original prototype (.dc.html) used a warm green/tan palette that was
+  reverse-engineered from screenshots — not the real brand. This build uses
+  the official Nemis Nutrition / Liberi dalle Calorie tokens (teal + gold,
+  Poppins) from the `nemis-design` skill instead, keeping the prototype's
+  exact spacing/radius/shadow *structure* but recoloring it to brand.
+*/
+:root {
+  /* Brand core (from nemis-design/tokens/colors.css) */
+  --teal-900: #0B3B4A;
+  --teal-700: #01728A;
+  --teal-500: #01ADBB;
+  --teal-100: #D2E6F1;
+  --gold: #F7D127;
+  --gold-ink: #12283A;
+  --border-subtle: #BFE0E8;
+
+  /* Derived (same role/contrast purpose as the prototype's amber accents,
+     extended from the brand gold since the brand has no separate
+     "text-on-light" amber token) */
+  --gold-deep: #C79A12;
+  --gold-text: #8A6D12;
+  --gold-tint: #FDF3CE;
+  --gold-tint-border: #F2DD8A;
+
+  /* Ink / text */
+  --ink: #12313D;
+  --ink-soft: #2C5F6C;
+  --ink-faint: #6C93A0;
+  --ink-on-dark-soft: #A9C7D1;
+
+  /* Surfaces */
+  --page-bg: #F4F9FC;
+  --app-surface: #F2F9FA;
+  --card: #FFFFFF;
+  --neutral-chip: #E7F1F5;
+  --dark-surface: var(--teal-900);
+
+  /* Semantic verdict colors */
+  --good-fg: var(--teal-700);
+  --good-bg: var(--teal-100);
+  --ok-fg: var(--gold-text);
+  --ok-bg: var(--gold-tint);
+  --ok-border: var(--gold-tint-border);
+  --bad-fg: #C0502A;
+  --bad-fg-strong: #D06A3C;
+  --bad-bg: #FBE7DE;
+
+  /* Lines */
+  --line-soft: rgba(11, 59, 74, .07);
+  --line-medium: rgba(11, 59, 74, .12);
+  --line-strong: rgba(11, 59, 74, .18);
+  --line-heavy: rgba(11, 59, 74, .22);
+
+  /* Gradients (same angle/stops as prototype, brand colors) */
+  --gradient-ring: linear-gradient(150deg, var(--teal-700), var(--teal-900));
+  --shadow-ring: 0 12px 26px rgba(1, 114, 138, .28);
+  --shadow-cta: 0 10px 22px rgba(1, 114, 138, .32);
+  --shadow-shell: 0 24px 60px rgba(11, 59, 74, .16);
+  --shadow-toast: 0 10px 26px rgba(11, 59, 74, .3);
+
+  /* External brand colors kept as-is (not part of Nemis identity) */
+  --whatsapp: #25D366;
+
+  --font-sans: 'Poppins', 'Segoe UI', sans-serif;
+}
