@@ -45,7 +45,13 @@ function App() {
           ) : (
             <>
               {d.tab === 'diario' && (
-                <DiarioView state={d.appState} onOpenMeal={d.openSheet} onOpenLogQuick={d.openLogQuick} onGoDigiuno={d.goDigiuno} />
+                <DiarioView
+                  state={d.appState}
+                  onOpenMeal={d.openSheet}
+                  onOpenLogQuick={d.openLogQuick}
+                  onGoDigiuno={d.goDigiuno}
+                  onDeleteMeal={d.deleteMeal}
+                />
               )}
               {d.tab === 'premi' && <PremiView state={d.appState} />}
               {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} />}

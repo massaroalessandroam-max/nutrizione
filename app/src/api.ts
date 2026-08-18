@@ -16,6 +16,7 @@ export const api = {
   getState: () => req<AppState>('/state'),
   logMeal: (key: MealKey, foods: string[]) =>
     req<LogResponse>(`/meals/${key}/log`, { method: 'POST', body: JSON.stringify({ foods }) }),
+  deleteMeal: (key: MealKey) => req<AppState>(`/meals/${key}/log`, { method: 'DELETE' }),
   toggleFast: () => req<AppState>('/fast/toggle', { method: 'POST' }),
   setFreq: (freq: AppState['freq']) =>
     req<AppState>('/settings/freq', { method: 'PUT', body: JSON.stringify({ freq }) }),

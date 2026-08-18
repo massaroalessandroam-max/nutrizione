@@ -116,6 +116,12 @@ export function useDiario() {
     []
   );
 
+  const deleteMeal = useCallback(async (key: MealKey) => {
+    const s = await api.deleteMeal(key);
+    setAppState(s);
+    showToast('Pasto rimosso');
+  }, [showToast]);
+
   const toggleFast = useCallback(async () => {
     const s = await api.toggleFast();
     setAppState(s);
@@ -149,6 +155,7 @@ export function useDiario() {
     submitLog,
     toast, showToast,
     completeOnboarding,
+    deleteMeal,
     toggleFast, setFreq, goDigiuno,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };

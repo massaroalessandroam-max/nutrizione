@@ -1,7 +1,7 @@
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
-import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon } from '../../icons';
+import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
 import { MEAL_SHORT, formatDateLabel } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
@@ -11,9 +11,10 @@ interface Props {
   onOpenMeal: (key: MealKey) => void;
   onOpenLogQuick: () => void;
   onGoDigiuno: () => void;
+  onDeleteMeal: (key: MealKey) => void;
 }
 
-export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno }: Props) {
+export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal }: Props) {
   const now = useNow(state.fastActive);
   const elapsedMs = Math.max(0, now - state.fastStart);
   const h = Math.floor(elapsedMs / 3600000);
@@ -63,23 +64,34 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno }: P
         {MEAL_ORDER.map((key) => {
           const meal = state.meals[key];
           return (
-            <button key={key} className="nm-meal-card" onClick={() => onOpenMeal(key)}>
-              <div className="nm-meal-icon" style={{ background: meal.done ? 'var(--good-bg)' : 'var(--neutral-chip)' }}>
-                <span style={{ color: meal.done ? 'var(--teal-900)' : 'var(--ink-faint)' }}>{MEAL_SHORT[key]}</span>
-              </div>
-              <div className="nm-meal-body">
-                <div className="nm-meal-title-row">
-                  <span className="nm-meal-title">{meal.label}</span>
-                  <span className="nm-meal-time">{meal.time}</span>
+            <div key={key} className="nm-meal-card">
+              <button className="nm-meal-card-main" onClick={() => onOpenMeal(key)}>
+                <div className="nm-meal-icon" style={{ background: meal.done ? 'var(--good-bg)' : 'var(--neutral-chip)' }}>
+                  <span style={{ color: meal.done ? 'var(--teal-900)' : 'var(--ink-faint)' }}>{MEAL_SHORT[key]}</span>
                 </div>
-                <div className="nm-meal-preview">{meal.done ? meal.foods.join(', ') : 'Tocca per registrare'}</div>
-              </div>
-              {meal.done ? (
-                <span className={badgeClass(meal.tone)}>{meal.scoreLabel}</span>
-              ) : (
-                <span className="nm-meal-add"><PlusIcon size={16} color="var(--teal-700)" /></span>
+                <div className="nm-meal-body">
+                  <div className="nm-meal-title-row">
+                    <span className="nm-meal-title">{meal.label}</span>
+                    <span className="nm-meal-time">{meal.time}</span>
+                  </div>
+                  <div className="nm-meal-preview">{meal.done ? meal.foods.join(', ') : 'Tocca per registrare'}</div>
+                </div>
+                {meal.done ? (
+                  <span className={badgeClass(meal.tone)}>{meal.scoreLabel}</span>
+                ) : (
+                  <span className="nm-meal-add"><PlusIcon size={16} color="var(--teal-700)" /></span>
+                )}
+              </button>
+              {meal.done && (
+                <button
+                  className="nm-meal-delete-btn"
+                  onClick={() => onDeleteMeal(key)}
+                  aria-label={`Elimina ${meal.label}`}
+                >
+                  <TrashIcon size={16} />
+                </button>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

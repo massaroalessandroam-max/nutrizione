@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { ORDER, LABEL, isMealKey, type MealKey } from '../constants.js';
-import { score, verdict, pointsForFoods } from '../match.js';
+import { score, verdict, verdictOf, pointsForFoods, type MatchContext } from '../match.js';
 import { computeStreak, computeWeek, computeBadges } from '../stats.js';
 
 export const stateRouter = Router();
@@ -37,6 +37,14 @@ export async function loadSchedule() {
   return { ...meals, snacks };
 }
 
+// Alimenti del piano Nemis del paziente (caricato in PianoView): hanno
+// priorità sulle liste generiche CONSIGLIATI/SCONSIGLIATI nel match engine.
+async function loadMatchContext(): Promise<MatchContext> {
+  const { rows } = await db.execute('SELECT name FROM nutrition_plan_items');
+  const planFoods = (rows as any[]).map((r) => r.name as string);
+  return { planFoods, month: new Date().getMonth() + 1 };
+}
+
 function readFastingPref(appState: any) {
   return {
     enabled: !!appState.fast_pref_enabled,
@@ -66,16 +74,17 @@ export async function buildState() {
   const { rows } = await db.execute('SELECT * FROM app_state WHERE id = 1');
   const appState = rows[0] as any;
   const meals = await loadMeals(date);
+  const ctx = await loadMatchContext();
 
   const doneCount = ORDER.filter((k) => meals[k].done).length;
   const allFoods = ORDER.flatMap((k) => meals[k].foods);
-  const goodCount = allFoods.filter((f) => verdict(f) === 'good').length;
+  const goodCount = allFoods.filter((f) => verdict(f, ctx) === 'good').length;
   const adherence = allFoods.length ? Math.round((goodCount / allFoods.length) * 100) : 0;
 
   const mealsOut = Object.fromEntries(
     ORDER.map((k) => {
       const m = meals[k];
-      const sc = score(m.foods);
+      const sc = score(m.foods, ctx);
       return [k, { ...m, label: LABEL[k], scoreLabel: sc.label, tone: sc.tone }];
     })
   );
@@ -142,17 +151,46 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
     args: [date, key, JSON.stringify(foods), time],
   });
 
-  const pts = pointsForFoods(foods);
+  const ctx = await loadMatchContext();
+  const pts = pointsForFoods(foods, ctx);
   await db.execute({ sql: 'UPDATE app_state SET points = points + ? WHERE id = 1', args: [pts] });
 
-  const sc = score(foods);
+  const sc = score(foods, ctx);
   const summary = {
     key,
     label: LABEL[key],
-    foods: foods.map((f) => ({ name: f, verdict: verdict(f) })),
+    foods: foods.map((f) => {
+      const v = verdictOf(f, ctx);
+      return { name: f, verdict: v.tone, reason: v.reason };
+    }),
     score: sc,
     pointsEarned: pts,
   };
 
   res.json({ state: await buildState(), summary });
+});
+
+stateRouter.delete('/meals/:key/log', async (req, res) => {
+  const { key } = req.params;
+  if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
+
+  const date = todayStr();
+  const { rows } = await db.execute({
+    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
+    args: [date, key],
+  });
+  const row = rows[0] as any;
+  if (row) {
+    const foods: string[] = JSON.parse(row.foods);
+    const pts = pointsForFoods(foods, await loadMatchContext());
+    await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ?) WHERE id = 1', args: [pts] });
+  }
+
+  await db.execute({
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 0, '[]', '')
+          ON CONFLICT(date, meal_key) DO UPDATE SET done = 0, foods = '[]', time = ''`,
+    args: [date, key],
+  });
+
+  res.json(await buildState());
 });

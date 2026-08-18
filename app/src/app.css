@@ -101,10 +101,20 @@
 /* ===== Meal list ===== */
 .nm-meals { margin-top: 18px; display: flex; flex-direction: column; gap: 11px; }
 .nm-meal-card {
-  display: flex; align-items: center; gap: 13px; width: 100%;
+  display: flex; align-items: center; gap: 4px; width: 100%;
   background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: 16px; padding: 12px 14px; cursor: pointer; text-align: left;
+  border-radius: 16px; padding: 12px 14px;
 }
+.nm-meal-card-main {
+  display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+}
+.nm-meal-delete-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 9px; border: none;
+  background: transparent; color: var(--ink-faint); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.nm-meal-delete-btn:hover { background: var(--bad-bg); color: var(--bad-fg-strong); }
 .nm-meal-icon {
   width: 44px; height: 44px; border-radius: 13px; flex: none;
   display: flex; align-items: center; justify-content: center;
@@ -397,15 +407,11 @@
 .nm-summary-body { padding: 20px; }
 .nm-summary-body-title { font-weight: 600; font-size: 14px; margin-bottom: 5px; }
 .nm-summary-body-sub { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 13px; }
-.nm-summary-foods { display: flex; flex-direction: column; gap: 9px; }
-.nm-summary-food-row {
-  display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: 14px; padding: 13px 15px;
+.nm-summary-foods {
+  display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 15px 15px 15px 32px;
+  background: var(--card); border: 1px solid var(--line-soft); border-radius: 14px;
 }
-.nm-summary-food-icon {
-  width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center;
-  justify-content: center; flex: none;
-}
+.nm-summary-food-item::marker { color: var(--marker-color, var(--ink-faint)); font-size: 1.2em; }
 .nm-summary-food-name { font-weight: 600; font-size: 14px; }
 .nm-summary-food-verdict { font-size: 12px; font-weight: 600; }
 .nm-summary-actions { display: flex; gap: 11px; margin-top: 20px; }

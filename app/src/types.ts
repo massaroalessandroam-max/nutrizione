@@ -65,9 +65,15 @@ export interface AppState {
   badges: Badge[];
 }
 
+// Perché un alimento ha ricevuto quel verdetto: 'plan' = presente nel piano
+// Nemis caricato dal paziente, 'season-in'/'season-out' = frutta/verdura
+// di/fuori stagione, 'list' = liste generiche consigliati/sconsigliati.
+export type VerdictReason = 'plan' | 'season-in' | 'season-out' | 'list' | 'none';
+
 export interface FoodVerdict {
   name: string;
   verdict: Tone;
+  reason?: VerdictReason;
 }
 
 export interface LogSummary {

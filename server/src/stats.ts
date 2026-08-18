@@ -94,6 +94,10 @@ export async function computeBadges(streak: number): Promise<Badge[]> {
     if (!r.done) continue;
     const foods: string[] = JSON.parse(r.foods);
     for (const f of foods) {
+      // ponytail: badge sui alimenti storici valutati con le regole di
+      // OGGI (mese corrente, nessun piano) invece che con mese/piano validi
+      // quel giorno — approssimazione accettabile per un conteggio
+      // gamification, da rivedere se serve precisione storica.
       if (verdict(f) === 'good') {
         goodFoods.add(f.toLowerCase());
         if (r.meal_key === ORDER[0]) goodBreakfasts += 1;

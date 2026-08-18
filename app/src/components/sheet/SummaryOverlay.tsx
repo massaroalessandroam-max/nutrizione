@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react';
 import type { LogSummary } from '../../types';
-import { VerdictIcon, StarIcon } from '../../icons';
-import { toneBg, toneColor } from '../../lib/tone';
+import { StarIcon } from '../../icons';
+import { toneColor, verdictLabel } from '../../lib/tone';
 
 interface Props {
   open: boolean;
@@ -65,21 +66,16 @@ export function SummaryOverlay({ open, summary, onClose, onSend }: Props) {
       <div className="nm-summary-body">
         <div className="nm-summary-body-title">{summary.label}</div>
         <div className="nm-summary-body-sub">Match con il tuo piano Nemis consigliato</div>
-        <div className="nm-summary-foods">
+        <ul className="nm-summary-foods">
           {summary.foods.map((f) => (
-            <div key={f.name} className="nm-summary-food-row">
-              <div className="nm-summary-food-icon" style={{ background: toneBg(f.verdict) }}>
-                <VerdictIcon tone={f.verdict} color={toneColor(f.verdict)} />
-              </div>
-              <div>
-                <div className="nm-summary-food-name">{f.name}</div>
-                <div className="nm-summary-food-verdict" style={{ color: toneColor(f.verdict) }}>
-                  {f.verdict === 'good' ? 'Consigliato dal piano' : f.verdict === 'ok' ? 'Consentito con moderazione' : 'Da limitare'}
-                </div>
-              </div>
-            </div>
+            <li key={f.name} className="nm-summary-food-item" style={{ '--marker-color': toneColor(f.verdict) } as CSSProperties}>
+              <span className="nm-summary-food-name">{f.name}</span>{' '}
+              <span className="nm-summary-food-verdict" style={{ color: toneColor(f.verdict) }}>
+                {verdictLabel(f)}
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
         <div className="nm-summary-actions">
           <button className="nm-btn-ghost" onClick={onClose}>Chiudi</button>
           <button className="nm-btn-primary" onClick={onSend}>Invia al nutrizionista</button>
