@@ -45,6 +45,20 @@ async function loadMatchContext(): Promise<MatchContext> {
   return { planFoods, month: new Date().getMonth() + 1 };
 }
 
+// I pasti "attivi" sono quelli che il paziente fa di solito (impostati in
+// onboarding): colazione/pranzo/cena se non segnati come "lo salto", lo
+// spuntino solo se ha configurato almeno un orario. Il conteggio
+// giornaliero (l'anello "X/N pasti") si basa su questi, non su un fisso 4,
+// altrimenti chi non fa spuntini non arriva mai al 100%.
+function computeActiveMeals(schedule: Awaited<ReturnType<typeof loadSchedule>>): MealKey[] {
+  const active: MealKey[] = [];
+  if (schedule.colazione.enabled) active.push('colazione');
+  if (schedule.pranzo.enabled) active.push('pranzo');
+  if (schedule.cena.enabled) active.push('cena');
+  if (schedule.snacks.length > 0) active.push('spuntino');
+  return active;
+}
+
 function readFastingPref(appState: any) {
   return {
     enabled: !!appState.fast_pref_enabled,
@@ -55,16 +69,16 @@ function readFastingPref(appState: any) {
 
 async function loadMeals(date: string) {
   const { rows } = await db.execute({
-    sql: 'SELECT meal_key, done, foods, time FROM meals WHERE date = ?',
+    sql: 'SELECT meal_key, done, foods, time, skipped FROM meals WHERE date = ?',
     args: [date],
   });
   const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
-  const meals: Record<MealKey, { done: boolean; foods: string[]; time: string }> = {} as any;
+  const meals: Record<MealKey, { done: boolean; foods: string[]; time: string; skipped: boolean }> = {} as any;
   for (const key of ORDER) {
     const row = byKey.get(key) as any;
     meals[key] = row
-      ? { done: !!row.done, foods: JSON.parse(row.foods), time: row.time }
-      : { done: false, foods: [], time: '' };
+      ? { done: !!row.done, foods: JSON.parse(row.foods), time: row.time, skipped: !!row.skipped }
+      : { done: false, foods: [], time: '', skipped: false };
   }
   return meals;
 }
@@ -75,6 +89,13 @@ export async function buildState() {
   const appState = rows[0] as any;
   const meals = await loadMeals(date);
   const ctx = await loadMatchContext();
+  const schedule = await loadSchedule();
+  const activeMeals = computeActiveMeals(schedule);
+  // Denominatore di oggi: pasti abituali meno quelli saltati apposta oggi
+  // (es. digiuno prolungato che salta colazione+pranzo per un giorno) —
+  // diverso da activeMeals, che resta la routine e serve solo a decidere
+  // quali pasti mostrare in lista.
+  const activeMealCount = activeMeals.filter((k) => !meals[k].skipped).length;
 
   const doneCount = ORDER.filter((k) => meals[k].done).length;
   const allFoods = ORDER.flatMap((k) => meals[k].foods);
@@ -100,7 +121,9 @@ export async function buildState() {
     fastStart: appState.fast_start as number,
     greetingName: appState.greeting_name as string,
     onboarded: !!appState.onboarded,
-    schedule: await loadSchedule(),
+    schedule,
+    activeMeals,
+    activeMealCount,
     fastingPref: readFastingPref(appState),
     doneCount,
     adherencePct: adherence,
@@ -146,8 +169,8 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
   const date = todayStr();
   const time = new Date().toTimeString().slice(0, 5);
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 1, ?, ?)
-          ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time`,
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 1, ?, ?, 0)
+          ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time, skipped = 0`,
     args: [date, key, JSON.stringify(foods), time],
   });
 
@@ -187,9 +210,24 @@ stateRouter.delete('/meals/:key/log', async (req, res) => {
   }
 
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time) VALUES (?, ?, 0, '[]', '')
-          ON CONFLICT(date, meal_key) DO UPDATE SET done = 0, foods = '[]', time = ''`,
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 0, '[]', '', 0)
+          ON CONFLICT(date, meal_key) DO UPDATE SET done = 0, foods = '[]', time = '', skipped = 0`,
     args: [date, key],
+  });
+
+  res.json(await buildState());
+});
+
+stateRouter.put('/meals/:key/skip', async (req, res) => {
+  const { key } = req.params;
+  if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
+  const skipped = req.body?.skipped === true ? 1 : 0;
+  const date = todayStr();
+
+  await db.execute({
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 0, '[]', '', ?)
+          ON CONFLICT(date, meal_key) DO UPDATE SET skipped = excluded.skipped`,
+    args: [date, key, skipped],
   });
 
   res.json(await buildState());

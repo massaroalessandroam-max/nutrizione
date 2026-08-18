@@ -143,6 +143,24 @@ export function TrashIcon({ size = 16, color = 'currentColor' }: IconProps) {
   );
 }
 
+export function MinusCircleIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12h8" />
+    </svg>
+  );
+}
+
+export function UndoIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <path d="M3 10h9a5 5 0 010 10H8" />
+      <path d="M7 5L3 10l4 5" />
+    </svg>
+  );
+}
+
 export function BackArrowIcon({ size = 16, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.4}>

@@ -83,3 +83,55 @@ export function generateDiarioPdf(opts: PdfDiarioOptions) {
 
   doc.save(`diario-nemis-${opts.patientName.toLowerCase().replace(/\s+/g, '-')}-${opts.date}.pdf`);
 }
+
+export interface PdfPlanItem {
+  name: string;
+  quantity: string;
+}
+
+export function generatePlanPdf(items: PdfPlanItem[], patientName: string) {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const marginX = 48;
+  let y = 56;
+
+  doc.setFillColor(...TEAL_DARK);
+  doc.rect(0, 0, 595, 96, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('Piano Nemis', marginX, 44);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(`${patientName} · ${new Date().toLocaleDateString('it-IT')}`, marginX, 66);
+
+  y = 128;
+  doc.setTextColor(...TEAL_DARK);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Alimenti e grammature', marginX, y);
+  y += 20;
+  doc.setDrawColor(...LINE);
+  doc.line(marginX, y, 595 - marginX, y);
+  y += 26;
+
+  for (const item of items) {
+    doc.setTextColor(...TEAL_DARK);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(item.name, marginX, y);
+    doc.setTextColor(...INK_SOFT);
+    doc.text(item.quantity, 595 - marginX, y, { align: 'right' });
+    y += 22;
+
+    if (y > 760) {
+      doc.addPage();
+      y = 56;
+    }
+  }
+
+  doc.setTextColor(...INK_SOFT);
+  doc.setFontSize(9);
+  doc.text('Generato da Diario Nemis · Metodo Nemis', marginX, 812);
+
+  doc.save(`piano-nemis-${patientName.toLowerCase().replace(/\s+/g, '-') || 'paziente'}.pdf`);
+}

@@ -1,7 +1,7 @@
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
-import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon } from '../../icons';
+import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
 import { MEAL_SHORT, formatDateLabel } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
@@ -12,9 +12,10 @@ interface Props {
   onOpenLogQuick: () => void;
   onGoDigiuno: () => void;
   onDeleteMeal: (key: MealKey) => void;
+  onSkipMeal: (key: MealKey, skipped: boolean) => void;
 }
 
-export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal }: Props) {
+export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal, onSkipMeal }: Props) {
   const now = useNow(state.fastActive);
   const elapsedMs = Math.max(0, now - state.fastStart);
   const h = Math.floor(elapsedMs / 3600000);
@@ -22,9 +23,17 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
   const fastPct = Math.min(1, elapsedMs / (16 * 3600000));
 
   const doneCount = state.doneCount;
-  const dayHeadline = doneCount >= 3 ? 'Giornata quasi completa!' : 'Buon lavoro finora';
-  const daySub = doneCount >= 3 ? 'Ti manca poco per il bonus di oggi.' : 'Registra i prossimi pasti per guadagnare punti.';
+  // Denominatore basato sui pasti che il paziente fa davvero (onboarding) e
+  // su eventuali "salta oggi" (es. digiuno prolungato) — non un fisso 4,
+  // altrimenti chi non fa spuntini (o oggi salta un pasto) non arriva mai
+  // al 100%.
+  const activeCount = Math.max(1, state.activeMealCount);
+  const shownCount = Math.min(doneCount, activeCount);
+  const almostThreshold = Math.max(1, activeCount - 1);
+  const dayHeadline = doneCount >= almostThreshold ? 'Giornata quasi completa!' : 'Buon lavoro finora';
+  const daySub = doneCount >= almostThreshold ? 'Ti manca poco per il bonus di oggi.' : 'Registra i prossimi pasti per guadagnare punti.';
   const weekPct = '68%';
+  const visibleMeals = MEAL_ORDER.filter((k) => state.activeMeals.includes(k) || state.meals[k].done);
 
   return (
     <div className="nm-section">
@@ -46,8 +55,8 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
       </div>
 
       <div className="nm-ring-card">
-        <RingSvg size={112} radius={48} strokeWidth={10} progress={doneCount / 4} trackColor="rgba(255,255,255,.22)" progressColor="var(--gold)">
-          <span className="nm-ring-count">{doneCount}/4</span>
+        <RingSvg size={112} radius={48} strokeWidth={10} progress={shownCount / activeCount} trackColor="rgba(255,255,255,.22)" progressColor="var(--gold)">
+          <span className="nm-ring-count">{shownCount}/{activeCount}</span>
           <span className="nm-ring-unit">PASTI</span>
         </RingSvg>
         <div className="nm-ring-info">
@@ -61,7 +70,7 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
       </div>
 
       <div className="nm-meals">
-        {MEAL_ORDER.map((key) => {
+        {visibleMeals.map((key) => {
           const meal = state.meals[key];
           return (
             <div key={key} className="nm-meal-card">
@@ -74,13 +83,15 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
                     <span className="nm-meal-title">{meal.label}</span>
                     <span className="nm-meal-time">{meal.time}</span>
                   </div>
-                  <div className="nm-meal-preview">{meal.done ? meal.foods.join(', ') : 'Tocca per registrare'}</div>
+                  <div className="nm-meal-preview">
+                    {meal.done ? meal.foods.join(', ') : meal.skipped ? 'Saltato oggi' : 'Tocca per registrare'}
+                  </div>
                 </div>
                 {meal.done ? (
                   <span className={badgeClass(meal.tone)}>{meal.scoreLabel}</span>
-                ) : (
+                ) : !meal.skipped ? (
                   <span className="nm-meal-add"><PlusIcon size={16} color="var(--teal-700)" /></span>
-                )}
+                ) : null}
               </button>
               {meal.done && (
                 <button
@@ -89,6 +100,24 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
                   aria-label={`Elimina ${meal.label}`}
                 >
                   <TrashIcon size={16} />
+                </button>
+              )}
+              {!meal.done && !meal.skipped && (
+                <button
+                  className="nm-meal-delete-btn"
+                  onClick={() => onSkipMeal(key, true)}
+                  aria-label={`Salta ${meal.label} oggi`}
+                >
+                  <MinusCircleIcon size={16} />
+                </button>
+              )}
+              {!meal.done && meal.skipped && (
+                <button
+                  className="nm-meal-delete-btn"
+                  onClick={() => onSkipMeal(key, false)}
+                  aria-label={`Ripristina ${meal.label}`}
+                >
+                  <UndoIcon size={16} />
                 </button>
               )}
             </div>

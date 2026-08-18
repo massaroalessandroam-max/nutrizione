@@ -17,6 +17,8 @@ export const api = {
   logMeal: (key: MealKey, foods: string[]) =>
     req<LogResponse>(`/meals/${key}/log`, { method: 'POST', body: JSON.stringify({ foods }) }),
   deleteMeal: (key: MealKey) => req<AppState>(`/meals/${key}/log`, { method: 'DELETE' }),
+  skipMeal: (key: MealKey, skipped: boolean) =>
+    req<AppState>(`/meals/${key}/skip`, { method: 'PUT', body: JSON.stringify({ skipped }) }),
   toggleFast: () => req<AppState>('/fast/toggle', { method: 'POST' }),
   setFreq: (freq: AppState['freq']) =>
     req<AppState>('/settings/freq', { method: 'PUT', body: JSON.stringify({ freq }) }),
@@ -24,6 +26,8 @@ export const api = {
     req<AppState>('/onboarding', { method: 'POST', body: JSON.stringify({ name, schedule, snacks, fasting }) }),
   getPlan: () => req<PlanItem[]>('/plan'),
   savePlan: (items: PlanItem[]) => req<PlanItem[]>('/plan', { method: 'POST', body: JSON.stringify({ items }) }),
+  extractPlan: (fileBase64: string, mediaType: string) =>
+    req<PlanItem[]>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
   getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
 };

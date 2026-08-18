@@ -1,41 +1,56 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { api, type PlanItem } from '../../api';
-import { CameraIcon, PlusIcon } from '../../icons';
+import { CameraIcon, PdfIcon, PlusIcon } from '../../icons';
+import { generatePlanPdf } from '../../lib/pdf';
+import { SHOPPING_DAY_OPTIONS, buildShoppingList, type ShoppingDays } from '../../lib/shoppingList';
 
-// Nessuna API di visione/OCR configurata (stessa situazione del
-// riconoscimento foto pasto in LogSheet): l'estrazione è mockata con una
-// lista plausibile. Da sostituire con un servizio OCR/vision reale quando
-// disponibile — il caricamento del file resta client-side, non c'è ancora
-// uno storage lato server per l'immagine/PDF originale.
-const MOCK_EXTRACTED: PlanItem[] = [
-  { name: 'Petto di pollo', quantity: '150 g' },
-  { name: 'Riso integrale', quantity: '70 g' },
-  { name: 'Verdura mista', quantity: '200 g' },
-  { name: 'Olio evo', quantity: '1 cucchiaio' },
-];
+const DAY_LABEL: Record<ShoppingDays, string> = { 2: '2 giorni', 3: '3 giorni', 7: '1 settimana' };
 
-export function PianoView() {
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error ?? new Error('lettura file fallita'));
+    reader.readAsDataURL(file);
+  });
+}
+
+interface Props {
+  patientName: string;
+}
+
+export function PianoView({ patientName }: Props) {
   const [items, setItems] = useState<PlanItem[] | null>(null);
   const [fileName, setFileName] = useState('');
   const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [shoppingDays, setShoppingDays] = useState<ShoppingDays>(7);
 
   useEffect(() => {
     api.getPlan().then(setItems).catch(() => setItems([]));
   }, []);
 
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
     setSaved(false);
+    setExtractError('');
     setExtracting(true);
-    setTimeout(() => {
-      setItems(MOCK_EXTRACTED);
+    // Estrazione una tantum: parte solo qui, al caricamento di un file
+    // nuovo, non si ripete finché non ne arriva un altro.
+    try {
+      const fileBase64 = await fileToBase64(file);
+      const extracted = await api.extractPlan(fileBase64, file.type || 'application/octet-stream');
+      setItems(extracted);
+    } catch (err) {
+      setExtractError((err as Error).message || 'Estrazione fallita. Inserisci gli alimenti a mano.');
+    } finally {
       setExtracting(false);
-    }, 900);
+    }
   };
 
   const setName = (i: number, name: string) =>
@@ -55,6 +70,13 @@ export function PianoView() {
     setSaved(true);
   };
 
+  const downloadPdf = () => {
+    if (!items?.length) return;
+    generatePlanPdf(items, patientName);
+  };
+
+  const shoppingList = useMemo(() => buildShoppingList(items ?? [], shoppingDays), [items, shoppingDays]);
+
   return (
     <div className="nm-section">
       <div className="nm-page-title">Piano del nutrizionista</div>
@@ -69,11 +91,20 @@ export function PianoView() {
         </div>
       </label>
 
+      {extractError && <div className="nm-plan-error">{extractError}</div>}
+
       {items === null ? (
         <div className="nm-empty-state">Caricamento…</div>
       ) : (
         <>
-          <div className="nm-section-label" style={{ marginTop: 20 }}>Alimenti e grammature</div>
+          <div className="nm-plan-section-head">
+            <div className="nm-section-label" style={{ marginTop: 20, marginBottom: 0 }}>Alimenti e grammature</div>
+            {items.length > 0 && (
+              <button className="nm-plan-pdf-btn" onClick={downloadPdf} aria-label="Scarica piano in PDF">
+                <PdfIcon size={15} /> PDF
+              </button>
+            )}
+          </div>
           {items.length === 0 && <div className="nm-hint">Nessun alimento ancora. Carica un file o aggiungi a mano.</div>}
 
           {items.map((it, i) => (
@@ -101,6 +132,32 @@ export function PianoView() {
           <button className="nm-submit-btn" disabled={saving} onClick={save}>
             {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
           </button>
+
+          {items.length > 0 && (
+            <>
+              <div className="nm-section-label" style={{ marginTop: 26 }}>Lista della spesa</div>
+              <div className="nm-chip-row">
+                {SHOPPING_DAY_OPTIONS.map((d) => (
+                  <button
+                    key={d}
+                    className={`nm-chip ${shoppingDays === d ? 'is-on' : 'is-off'}`}
+                    onClick={() => setShoppingDays(d)}
+                  >
+                    {DAY_LABEL[d]}
+                  </button>
+                ))}
+              </div>
+              <div className="nm-plan-item-list">
+                {shoppingList.map((entry, i) => (
+                  <div key={i} className="nm-shopping-row">
+                    <span>{entry.name}</span>
+                    <span className="nm-shopping-qty">{entry.quantity}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="nm-hint">Quantità stimate assumendo il consumo indicato ogni giorno del periodo scelto.</div>
+            </>
+          )}
         </>
       )}
     </div>

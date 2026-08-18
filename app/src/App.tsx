@@ -51,11 +51,12 @@ function App() {
                   onOpenLogQuick={d.openLogQuick}
                   onGoDigiuno={d.goDigiuno}
                   onDeleteMeal={d.deleteMeal}
+                  onSkipMeal={d.skipMeal}
                 />
               )}
               {d.tab === 'premi' && <PremiView state={d.appState} />}
               {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} />}
-              {d.tab === 'piano' && <PianoView />}
+              {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
               {d.tab === 'report' && (
                 <ReportView
                   state={d.appState}

@@ -84,9 +84,15 @@ export async function initDb(): Promise<void> {
       done INTEGER NOT NULL,
       foods TEXT NOT NULL,
       time TEXT NOT NULL,
+      skipped INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (date, meal_key)
     );
   `);
+  try {
+    await db.execute('ALTER TABLE meals ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0');
+  } catch {
+    // colonna già presente
+  }
   await db.execute(`
     CREATE TABLE IF NOT EXISTS patients (
       id TEXT PRIMARY KEY,

@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import type { LogMode } from '../../hooks/useDiario';
 import { MicIcon, ModeIcon, CameraIcon } from '../../icons';
 import { toneBg, toneColor, toneGlyph } from '../../lib/tone';
 import { useSpeechRecognition, speechRecognitionSupported } from '../../hooks/useSpeechRecognition';
+import { api, type PlanItem } from '../../api';
 
 const MODES: Array<{ key: LogMode; label: string }> = [
   { key: 'text', label: 'Testo' },
@@ -45,9 +46,17 @@ export function LogSheet({
 }: Props) {
   const { recording, error, start, stop } = useSpeechRecognition();
 
+  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   useEffect(() => {
     if (!open) stop();
   }, [open, stop]);
+
+  useEffect(() => {
+    if (open) api.getPlan().then(setPlanItems).catch(() => setPlanItems([]));
+    else setShowSuggestions(false);
+  }, [open]);
 
   if (!open) return null;
 
@@ -101,6 +110,27 @@ export function LogSheet({
             );
           })}
         </div>
+
+        {planItems.length > 0 && (
+          <div className="nm-suggestions">
+            <button className="nm-suggestions-toggle" onClick={() => setShowSuggestions((s) => !s)}>
+              Suggerimenti dal piano {showSuggestions ? '▲' : '▼'}
+            </button>
+            {showSuggestions && (
+              <div className="nm-suggestions-chips">
+                {planItems.map((it) => (
+                  <button
+                    key={it.name}
+                    className="nm-suggestion-chip"
+                    onClick={() => onLogTextChange(logText.trim() ? `${logText}, ${it.name}` : it.name)}
+                  >
+                    {it.name}{it.quantity ? ` · ${it.quantity}` : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {mode === 'text' && (
           <>

@@ -10,6 +10,9 @@ export interface MealState {
   label: string;
   scoreLabel: string;
   tone: Tone;
+  // Saltato apposta per oggi (es. digiuno prolungato) — diverso da "non
+  // ancora fatto": non conta nel denominatore del completamento giornaliero.
+  skipped: boolean;
 }
 
 export interface WeekDay {
@@ -57,6 +60,13 @@ export interface AppState {
   greetingName: string;
   onboarded: boolean;
   schedule: Schedule;
+  // Pasti che il paziente fa di solito (da onboarding): colazione/pranzo/
+  // cena non "saltati", spuntino solo se ha orari configurati. Decide quali
+  // pasti mostrare in lista.
+  activeMeals: MealKey[];
+  // Denominatore di oggi per l'anello "X/N pasti": activeMeals meno quelli
+  // marcati "salta oggi" (es. digiuno prolungato per un giorno).
+  activeMealCount: number;
   fastingPref: FastingPref;
   doneCount: number;
   adherencePct: number;

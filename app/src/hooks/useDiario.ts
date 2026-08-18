@@ -72,7 +72,13 @@ export function useDiario() {
   }, [appState]);
 
   const openLogQuick = useCallback(() => {
-    const nextMeal = MEAL_ORDER.find((k) => !appState?.meals[k]?.done) ?? 'spuntino';
+    // Preferisce il prossimo pasto tra quelli abituali del paziente; se
+    // sono già tutti fatti, propone comunque un pasto extra fuori routine.
+    const active = appState?.activeMeals ?? [];
+    const nextMeal =
+      active.find((k) => !appState?.meals[k]?.done) ??
+      MEAL_ORDER.find((k) => !appState?.meals[k]?.done) ??
+      'spuntino';
     openSheet(nextMeal);
   }, [appState, openSheet]);
 
@@ -122,6 +128,12 @@ export function useDiario() {
     showToast('Pasto rimosso');
   }, [showToast]);
 
+  const skipMeal = useCallback(async (key: MealKey, skipped: boolean) => {
+    const s = await api.skipMeal(key, skipped);
+    setAppState(s);
+    showToast(skipped ? 'Pasto saltato per oggi' : 'Pasto ripristinato');
+  }, [showToast]);
+
   const toggleFast = useCallback(async () => {
     const s = await api.toggleFast();
     setAppState(s);
@@ -156,6 +168,7 @@ export function useDiario() {
     toast, showToast,
     completeOnboarding,
     deleteMeal,
+    skipMeal,
     toggleFast, setFreq, goDigiuno,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };
