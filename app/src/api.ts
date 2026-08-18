@@ -1,4 +1,4 @@
-import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey } from './types';
+import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, Schedule, FastingPref } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -19,6 +19,15 @@ export const api = {
   toggleFast: () => req<AppState>('/fast/toggle', { method: 'POST' }),
   setFreq: (freq: AppState['freq']) =>
     req<AppState>('/settings/freq', { method: 'PUT', body: JSON.stringify({ freq }) }),
+  submitOnboarding: (name: string, schedule: Omit<Schedule, 'snacks'>, snacks: string[], fasting: FastingPref) =>
+    req<AppState>('/onboarding', { method: 'POST', body: JSON.stringify({ name, schedule, snacks, fasting }) }),
+  getPlan: () => req<PlanItem[]>('/plan'),
+  savePlan: (items: PlanItem[]) => req<PlanItem[]>('/plan', { method: 'POST', body: JSON.stringify({ items }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
   getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
 };
+
+export interface PlanItem {
+  name: string;
+  quantity: string;
+}

@@ -1,18 +1,16 @@
 import { useDiario } from './hooks/useDiario';
-import { RoleSwitch } from './components/RoleSwitch';
 import { BottomNav } from './components/BottomNav';
 import { Toast } from './components/Toast';
+import { OnboardingView } from './components/patient/OnboardingView';
 import { DiarioView } from './components/patient/DiarioView';
 import { PremiView } from './components/patient/PremiView';
 import { DigiunoView } from './components/patient/DigiunoView';
+import { PianoView } from './components/patient/PianoView';
 import { ReportView } from './components/patient/ReportView';
 import { LogSheet } from './components/sheet/LogSheet';
 import { SummaryOverlay } from './components/sheet/SummaryOverlay';
-import { PatientListView } from './components/nutritionist/PatientListView';
-import { PatientDetailView } from './components/nutritionist/PatientDetailView';
 import { generateDiarioPdf } from './lib/pdf';
 import { MEAL_ORDER } from './types';
-import type { PatientDetail } from './types';
 
 function App() {
   const d = useDiario();
@@ -31,55 +29,39 @@ function App() {
     d.showToast('PDF del diario generato');
   };
 
-  const handleDownloadPatientPdf = (patient: PatientDetail) => {
-    generateDiarioPdf({
-      patientName: patient.name,
-      date: new Date().toISOString().slice(0, 10),
-      adherencePct: Number.parseInt(patient.adherence, 10) || 0,
-      meals: patient.log.map((l) => ({ label: l.label, time: l.time, foods: l.foods.map((f) => f.name), scoreLabel: l.scoreLabel })),
-    });
-    d.showToast('PDF del diario generato');
-  };
-
   return (
     <div className="nm-page">
       <div className="nm-shell">
-        <RoleSwitch role={d.role} onChange={d.changeRole} />
-
-        {d.role === 'paziente' && (
-          <div className="nm-patient-body">
-            {d.loading || !d.appState ? (
-              <div className="nm-section"><div className="nm-empty-state">Caricamento…</div></div>
-            ) : (
-              <>
-                {d.tab === 'diario' && (
-                  <DiarioView state={d.appState} onOpenMeal={d.openSheet} onOpenLogQuick={d.openLogQuick} onGoDigiuno={d.goDigiuno} />
-                )}
-                {d.tab === 'premi' && <PremiView state={d.appState} />}
-                {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} />}
-                {d.tab === 'report' && (
-                  <ReportView
-                    state={d.appState}
-                    onSetFreq={d.setFreq}
-                    onExportPdf={handleExportOwnPdf}
-                    onSendWhatsapp={() => d.showToast('Apertura WhatsApp…')}
-                  />
-                )}
-              </>
-            )}
-            <BottomNav tab={d.tab} onChange={d.setTab} />
-          </div>
-        )}
-
-        {d.role === 'nutrizionista' && (
-          <div className="nm-nutri-body">
-            {!d.activePatientId ? (
-              <PatientListView patients={d.patients} onSelect={d.selectPatient} />
-            ) : (
-              <PatientDetailView patient={d.activePatient} onBack={d.backToList} onDownloadPdf={handleDownloadPatientPdf} />
-            )}
-          </div>
-        )}
+        <div className="nm-patient-body">
+          {d.loading || !d.appState ? (
+            <div className="nm-section"><div className="nm-empty-state">Caricamento…</div></div>
+          ) : !d.appState.onboarded ? (
+            <OnboardingView
+              meals={d.appState.meals}
+              defaultSchedule={d.appState.schedule}
+              defaultFasting={d.appState.fastingPref}
+              onSubmit={d.completeOnboarding}
+            />
+          ) : (
+            <>
+              {d.tab === 'diario' && (
+                <DiarioView state={d.appState} onOpenMeal={d.openSheet} onOpenLogQuick={d.openLogQuick} onGoDigiuno={d.goDigiuno} />
+              )}
+              {d.tab === 'premi' && <PremiView state={d.appState} />}
+              {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} />}
+              {d.tab === 'piano' && <PianoView />}
+              {d.tab === 'report' && (
+                <ReportView
+                  state={d.appState}
+                  onSetFreq={d.setFreq}
+                  onExportPdf={handleExportOwnPdf}
+                  onSendWhatsapp={() => d.showToast('Apertura WhatsApp…')}
+                />
+              )}
+            </>
+          )}
+          {d.appState?.onboarded && <BottomNav tab={d.tab} onChange={d.setTab} />}
+        </div>
 
         {d.appState && (
           <LogSheet

@@ -27,6 +27,26 @@ export interface Badge {
   earned: boolean;
 }
 
+export interface MealScheduleEntry {
+  enabled: boolean;
+  time: string;
+}
+
+// Colazione/pranzo/cena hanno un solo orario abituale; gli spuntini possono
+// essere più di uno, quindi sono una lista di orari invece di un'unica voce.
+export interface Schedule {
+  colazione: MealScheduleEntry;
+  pranzo: MealScheduleEntry;
+  cena: MealScheduleEntry;
+  snacks: string[];
+}
+
+export interface FastingPref {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
 export interface AppState {
   date: string;
   points: number;
@@ -35,6 +55,9 @@ export interface AppState {
   fastActive: boolean;
   fastStart: number;
   greetingName: string;
+  onboarded: boolean;
+  schedule: Schedule;
+  fastingPref: FastingPref;
   doneCount: number;
   adherencePct: number;
   meals: Record<MealKey, MealState>;

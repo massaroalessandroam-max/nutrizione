@@ -10,6 +10,41 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Colazione/pranzo/cena hanno un solo orario abituale ciascuno; gli
+// spuntini possono essere più d'uno, quindi vivono in una lista a parte
+// (snack_schedule) invece che come quarta chiave fissa.
+export const FIXED_SCHEDULE_MEALS = ['colazione', 'pranzo', 'cena'] as const;
+type FixedScheduleMeal = (typeof FIXED_SCHEDULE_MEALS)[number];
+
+export const DEFAULT_MEAL_TIME: Record<FixedScheduleMeal, string> = {
+  colazione: '08:00', pranzo: '13:00', cena: '20:00',
+};
+
+export async function loadSchedule() {
+  const { rows } = await db.execute('SELECT meal_key, enabled, time FROM meal_schedule');
+  const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
+  const meals: Record<FixedScheduleMeal, { enabled: boolean; time: string }> = {} as any;
+  for (const key of FIXED_SCHEDULE_MEALS) {
+    const row = byKey.get(key) as any;
+    meals[key] = row
+      ? { enabled: !!row.enabled, time: row.time }
+      : { enabled: true, time: DEFAULT_MEAL_TIME[key] };
+  }
+
+  const { rows: snackRows } = await db.execute('SELECT time FROM snack_schedule ORDER BY idx');
+  const snacks = (snackRows as any[]).map((r) => r.time as string);
+
+  return { ...meals, snacks };
+}
+
+function readFastingPref(appState: any) {
+  return {
+    enabled: !!appState.fast_pref_enabled,
+    start: appState.fast_pref_start as string,
+    end: appState.fast_pref_end as string,
+  };
+}
+
 async function loadMeals(date: string) {
   const { rows } = await db.execute({
     sql: 'SELECT meal_key, done, foods, time FROM meals WHERE date = ?',
@@ -55,6 +90,9 @@ export async function buildState() {
     fastActive: !!appState.fast_active,
     fastStart: appState.fast_start as number,
     greetingName: appState.greeting_name as string,
+    onboarded: !!appState.onboarded,
+    schedule: await loadSchedule(),
+    fastingPref: readFastingPref(appState),
     doneCount,
     adherencePct: adherence,
     meals: mealsOut,

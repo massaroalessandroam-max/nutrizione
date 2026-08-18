@@ -333,6 +333,41 @@
 .nm-food-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .nm-food-chip { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 9px; }
 
+.nm-text-input {
+  width: 100%; border: 1.5px solid var(--line-medium); border-radius: 14px;
+  padding: 13px 14px; font-size: 14.5px; background: var(--card); color: var(--ink);
+}
+
+.nm-onboard-meal-list { display: flex; flex-direction: column; gap: 9px; margin: 12px 0 4px; }
+.nm-onboard-meal-row { border: 1.5px solid var(--line-medium); border-radius: 14px; padding: 12px 14px; background: var(--card); }
+.nm-onboard-meal-row.is-off { background: var(--neutral-chip); }
+.nm-onboard-meal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nm-onboard-meal-name { font-weight: 600; font-size: 14px; }
+.nm-onboard-skip { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; }
+.nm-time-input {
+  margin-top: 10px; width: 100%; border: 1.5px solid var(--line-medium); border-radius: 10px;
+  padding: 9px 12px; font-size: 14px; background: var(--app-surface); color: var(--ink);
+}
+
+.nm-onboard-snack-row { display: flex; align-items: center; gap: 8px; }
+.nm-onboard-snack-row .nm-time-input { flex: 1; }
+.nm-onboard-remove-btn {
+  margin-top: 10px; width: 34px; height: 34px; flex: none; border: none; border-radius: 10px;
+  background: var(--neutral-chip); color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.nm-onboard-add-btn {
+  margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; border: 1.5px dashed var(--line-strong); border-radius: 10px; background: transparent;
+  color: var(--teal-700); font-size: 13px; font-weight: 600; padding: 9px; cursor: pointer;
+}
+.nm-onboard-fast-range { display: flex; gap: 12px; margin-top: 10px; }
+.nm-onboard-fast-range > div { flex: 1; }
+.nm-onboard-fast-label { font-size: 12px; color: var(--ink-faint); margin-bottom: 4px; }
+
+.nm-plan-item-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.nm-plan-qty-input { max-width: 110px; flex: none; }
+.nm-plan-item-row .nm-onboard-remove-btn { margin-top: 0; }
+
 .nm-submit-btn {
   margin-top: 16px; width: 100%; background: var(--teal-700); border: none; border-radius: 14px;
   padding: 15px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;

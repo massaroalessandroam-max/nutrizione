@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stateRouter } from './routes/state.js';
 import { patientsRouter } from './routes/patients.js';
+import { onboardingRouter } from './routes/onboarding.js';
+import { planRouter } from './routes/plan.js';
 import { initDb, isRemoteDb } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +20,8 @@ app.use(express.json());
 
 app.use('/api', stateRouter);
 app.use('/api', patientsRouter);
+app.use('/api', onboardingRouter);
+app.use('/api', planRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb() }));
 
@@ -37,6 +41,20 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'server_error', detail: err.message });
 });
 
+// Il piano free di Render mette in standby il servizio dopo ~15 minuti di
+// inattività: un self-ping periodico all'health endpoint lo tiene sveglio.
+// RENDER_EXTERNAL_URL è impostata automaticamente da Render, quindi in
+// locale questo blocco non fa nulla.
+function startKeepAlive() {
+  const externalUrl = process.env.RENDER_EXTERNAL_URL;
+  if (!externalUrl) return;
+  setInterval(() => {
+    fetch(`${externalUrl}/api/health`).catch((e) => {
+      console.error('[keep-alive] ping fallito:', (e as Error).message);
+    });
+  }, 10 * 60_000).unref();
+}
+
 // Lo schema va pronto prima di accettare richieste: con un database remoto
 // l'inizializzazione è una chiamata di rete.
 initDb()
@@ -48,6 +66,7 @@ initDb()
           ? 'Database remoto (persistente tra i deploy) collegato.'
           : 'Database su file locale: i dati NON sopravvivono a un nuovo deploy. Imposta DATABASE_URL per la persistenza.'
       );
+      startKeepAlive();
     });
   })
   .catch((e) => {

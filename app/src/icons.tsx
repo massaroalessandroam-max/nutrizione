@@ -44,6 +44,7 @@ const NAV_PATHS: Record<string, string> = {
   diario: 'M4 5a2 2 0 012-2h12v18H6a2 2 0 01-2-2zM8 3v18',
   premi: 'M12 2l3 6.3 6.9.9-5 4.8 1.2 6.9L12 17.6 5.9 20.9 7 14 2 9.2l6.9-.9z',
   digiuno: 'M12 5v7l4 2',
+  piano: 'M14 2v5h5M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7zM9 13h6M9 17h4',
   report: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
 };
 

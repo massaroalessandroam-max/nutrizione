@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { AppState, LogSummary, MealKey, PatientDetail, PatientListItem } from '../types';
+import type { AppState, FastingPref, LogSummary, MealKey, Schedule, PatientDetail, PatientListItem } from '../types';
 import { MEAL_ORDER } from '../types';
 
 export type Role = 'paziente' | 'nutrizionista';
-export type Tab = 'diario' | 'premi' | 'digiuno' | 'report';
+export type Tab = 'diario' | 'premi' | 'digiuno' | 'piano' | 'report';
 export type LogMode = 'text' | 'audio' | 'photo';
 
 const MOCK_PHOTO_FOODS = ['Petto di pollo', 'Insalata mista', 'Riso integrale', 'Olio evo'];
@@ -108,6 +108,14 @@ export function useDiario() {
     showToast('Pasto inviato al nutrizionista');
   }, [showToast]);
 
+  const completeOnboarding = useCallback(
+    async (name: string, schedule: Omit<Schedule, 'snacks'>, snacks: string[], fasting: FastingPref) => {
+      const s = await api.submitOnboarding(name, schedule, snacks, fasting);
+      setAppState(s);
+    },
+    []
+  );
+
   const toggleFast = useCallback(async () => {
     const s = await api.toggleFast();
     setAppState(s);
@@ -140,6 +148,7 @@ export function useDiario() {
     photoAdded, addPhoto,
     submitLog,
     toast, showToast,
+    completeOnboarding,
     toggleFast, setFreq, goDigiuno,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };
