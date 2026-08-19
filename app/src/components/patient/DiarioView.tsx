@@ -32,7 +32,11 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
   const almostThreshold = Math.max(1, activeCount - 1);
   const dayHeadline = doneCount >= almostThreshold ? 'Giornata quasi completa!' : 'Buon lavoro finora';
   const daySub = doneCount >= almostThreshold ? 'Ti manca poco per il bonus di oggi.' : 'Registra i prossimi pasti per guadagnare punti.';
-  const weekPct = '68%';
+  // Pasti fatti negli ultimi 7 giorni sul totale atteso (pasti/giorno di
+  // oggi × 7) — stessa base della ring giornaliera, non un valore fisso.
+  const weekDone = state.week.reduce((sum, d) => sum + d.doneCount, 0);
+  const weekTarget = activeCount * state.week.length;
+  const weekPct = `${weekTarget > 0 ? Math.min(100, Math.round((weekDone / weekTarget) * 100)) : 0}%`;
   const visibleMeals = MEAL_ORDER.filter((k) => state.activeMeals.includes(k) || state.meals[k].done);
 
   return (

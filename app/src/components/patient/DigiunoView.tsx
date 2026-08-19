@@ -5,13 +5,14 @@ import { useNow } from '../../hooks/useNow';
 interface Props {
   state: AppState;
   onToggleFast: () => void;
+  toggling: boolean;
 }
 
 function fmtClock(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function DigiunoView({ state, onToggleFast }: Props) {
+export function DigiunoView({ state, onToggleFast, toggling }: Props) {
   const now = useNow(state.fastActive);
   // Da fermo l'elapsed non deve contare dal vecchio fastStart (rimasto in
   // memoria per calcolare i punti di un digiuno concluso) — altrimenti
@@ -35,8 +36,12 @@ export function DigiunoView({ state, onToggleFast }: Props) {
           <span className="nm-fast-elapsed">{h}:{String(m).padStart(2, '0')}:{String(sec).padStart(2, '0')}</span>
           <span className="nm-fast-target">obiettivo 16:00</span>
         </RingSvg>
-        <button className={`nm-fast-toggle ${state.fastActive ? 'is-active' : 'is-inactive'}`} onClick={onToggleFast}>
-          {state.fastActive ? 'Termina digiuno' : 'Inizia digiuno'}
+        <button
+          className={`nm-fast-toggle ${state.fastActive ? 'is-active' : 'is-inactive'}`}
+          onClick={onToggleFast}
+          disabled={toggling}
+        >
+          {toggling ? '…' : state.fastActive ? 'Termina digiuno' : 'Inizia digiuno'}
         </button>
       </div>
 

@@ -55,7 +55,7 @@ function App() {
                 />
               )}
               {d.tab === 'premi' && <PremiView state={d.appState} />}
-              {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} />}
+              {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} toggling={d.fastToggling} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
               {d.tab === 'report' && (
                 <ReportView

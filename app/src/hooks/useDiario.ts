@@ -161,9 +161,24 @@ export function useDiario() {
     showToast(skipped ? 'Pasto saltato per oggi' : 'Pasto ripristinato');
   }, [showToast]);
 
+  const [fastToggling, setFastToggling] = useState(false);
+  const fastToggleInFlight = useRef(false);
   const toggleFast = useCallback(async () => {
-    const s = await api.toggleFast();
-    setAppState(s);
+    // Guardia sincrona (oltre al disabled sul pulsante, che aggiorna solo al
+    // prossimo render): un doppio tap sul touch può far partire due
+    // richieste prima che il bottone si disabiliti, e i due toggle si
+    // annullano a vicenda lasciando il digiuno com'era — sembra "non si
+    // ferma" anche se il singolo toggle funziona.
+    if (fastToggleInFlight.current) return;
+    fastToggleInFlight.current = true;
+    setFastToggling(true);
+    try {
+      const s = await api.toggleFast();
+      setAppState(s);
+    } finally {
+      fastToggleInFlight.current = false;
+      setFastToggling(false);
+    }
   }, []);
 
   const setFreq = useCallback(async (freq: AppState['freq']) => {
@@ -197,7 +212,7 @@ export function useDiario() {
     deleteMeal,
     updateMealFoods,
     skipMeal,
-    toggleFast, setFreq, goDigiuno,
+    toggleFast, fastToggling, setFreq, goDigiuno,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };
 }
