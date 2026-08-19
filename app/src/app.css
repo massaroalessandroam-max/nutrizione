@@ -312,10 +312,22 @@
   display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer;
   color: var(--teal-700); font-weight: 600; font-size: 13px; padding: 0;
 }
-.nm-suggestions-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
-.nm-suggestion-chip {
-  border: 1.5px solid var(--border-subtle); background: var(--good-bg); color: var(--teal-900);
-  border-radius: 999px; padding: 7px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+.nm-suggestions-table { margin-top: 11px; border: 1.5px solid var(--line-medium); border-radius: 14px; overflow: hidden; background: var(--card); }
+.nm-suggestions-group + .nm-suggestions-group { border-top: 1px solid var(--line-medium); }
+.nm-suggestions-group-title {
+  font-size: 11.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: .3px; padding: 10px 12px 4px;
+}
+.nm-suggestions-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+.nm-suggestions-row-name {
+  flex: 1; text-align: left; border: none; background: transparent; padding: 7px 4px; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--ink-soft); border-radius: 8px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nm-suggestions-row.is-on .nm-suggestions-row-name { color: var(--teal-700); background: var(--good-bg); }
+.nm-suggestions-row-qty {
+  width: 84px; flex: none; border: 1.5px solid var(--line-medium); border-radius: 8px;
+  padding: 6px 8px; font-size: 12.5px; background: var(--app-surface); color: var(--ink); text-align: right;
 }
 
 .nm-textarea {

@@ -5,7 +5,9 @@ import { MEAL_ORDER } from '../../types';
 import type { LogMode } from '../../hooks/useDiario';
 import { MicIcon, ModeIcon, CameraIcon } from '../../icons';
 import { useSpeechRecognition, speechRecognitionSupported } from '../../hooks/useSpeechRecognition';
-import { api, type PlanItem } from '../../api';
+import { api, PLAN_CATEGORIES, type PlanItem } from '../../api';
+
+const SUGGESTION_OTHER = 'Altro';
 
 const MODES: Array<{ key: LogMode; label: string }> = [
   { key: 'text', label: 'Testo' },
@@ -43,15 +45,50 @@ export function LogSheet({
 
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // Suggerimenti selezionati dal piano: quantità modificabile per voce, e
+  // un click li aggiunge al testo una sola volta (riclick li toglie)
+  // invece di duplicarli ad ogni tocco.
+  const [suggestionQty, setSuggestionQty] = useState<Record<string, string>>({});
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!open) stop();
   }, [open, stop]);
 
   useEffect(() => {
-    if (open) api.getPlan().then(setPlanItems).catch(() => setPlanItems([]));
-    else setShowSuggestions(false);
+    if (open) {
+      api.getPlan().then(setPlanItems).catch(() => setPlanItems([]));
+    } else {
+      setShowSuggestions(false);
+      setSelectedSuggestions(new Set());
+    }
   }, [open]);
+
+  const segmentFor = (name: string, qty: string) => (qty.trim() ? `${name} ${qty.trim()}` : name);
+
+  const toggleSuggestion = (it: PlanItem) => {
+    const qty = suggestionQty[it.name] ?? it.quantity;
+    const segment = segmentFor(it.name, qty);
+    const parts = logText.split(',').map((s) => s.trim()).filter(Boolean);
+    if (selectedSuggestions.has(it.name)) {
+      onLogTextChange(parts.filter((s) => s !== segment).join(', '));
+      setSelectedSuggestions((s) => { const next = new Set(s); next.delete(it.name); return next; });
+    } else {
+      onLogTextChange([...parts, segment].join(', '));
+      setSelectedSuggestions((s) => new Set(s).add(it.name));
+    }
+  };
+
+  const changeSuggestionQty = (it: PlanItem, newQty: string) => {
+    const oldQty = suggestionQty[it.name] ?? it.quantity;
+    setSuggestionQty((q) => ({ ...q, [it.name]: newQty }));
+    if (selectedSuggestions.has(it.name)) {
+      const oldSegment = segmentFor(it.name, oldQty);
+      const newSegment = segmentFor(it.name, newQty);
+      const parts = logText.split(',').map((s) => s.trim()).filter(Boolean).map((s) => (s === oldSegment ? newSegment : s));
+      onLogTextChange(parts.join(', '));
+    }
+  };
 
   if (!open) return null;
 
@@ -128,16 +165,31 @@ export function LogSheet({
               Suggerimenti dal piano {showSuggestions ? '▲' : '▼'}
             </button>
             {showSuggestions && (
-              <div className="nm-suggestions-chips">
-                {planItems.map((it) => (
-                  <button
-                    key={it.name}
-                    className="nm-suggestion-chip"
-                    onClick={() => onLogTextChange(logText.trim() ? `${logText}, ${it.name}` : it.name)}
-                  >
-                    {it.name}{it.quantity ? ` · ${it.quantity}` : ''}
-                  </button>
-                ))}
+              <div className="nm-suggestions-table">
+                {[...PLAN_CATEGORIES, SUGGESTION_OTHER].map((cat) => {
+                  const catItems = planItems.filter((it) =>
+                    cat === SUGGESTION_OTHER ? !(PLAN_CATEGORIES as readonly string[]).includes(it.category) : it.category === cat
+                  );
+                  if (!catItems.length) return null;
+                  return (
+                    <div key={cat} className="nm-suggestions-group">
+                      <div className="nm-suggestions-group-title">{cat}</div>
+                      {catItems.map((it) => (
+                        <div key={it.name} className={`nm-suggestions-row ${selectedSuggestions.has(it.name) ? 'is-on' : ''}`}>
+                          <button className="nm-suggestions-row-name" onClick={() => toggleSuggestion(it)}>
+                            {it.name}
+                          </button>
+                          <input
+                            className="nm-suggestions-row-qty"
+                            value={suggestionQty[it.name] ?? it.quantity}
+                            onChange={(e) => changeSuggestionQty(it, e.target.value)}
+                            placeholder="Quantità"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
