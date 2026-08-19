@@ -5,8 +5,10 @@ import { ANTHROPIC_API_KEY, MAX_BASE64_LEN, callClaudeWithFile, extractJsonArray
 export const planRouter = Router();
 
 // Macro-categorie fisse per raggruppare gli alimenti del piano, e opzioni
-// per il tetto settimanale concordato col nutrizionista.
-export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Frutta e verdura', 'Latticini'] as const;
+// per il tetto settimanale concordato col nutrizionista. Frutta e Verdura
+// separate (non "Frutta e verdura" unica) e Legumi/Grassi a parte da
+// Carboidrati/Proteine perché nutrizionalmente distinti.
+export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
 export const MAX_PER_WEEK_OPTIONS = ['1', '2', '3', 'sempre', 'opzionale'] as const;
 
 interface PlanItemBody {
@@ -64,7 +66,7 @@ Rispondi ESCLUSIVAMENTE con un array JSON valido, senza testo aggiuntivo prima o
 [{"name": "nome alimento", "quantity": "quantità, es. 150 g", "category": "categoria", "maxPerWeek": "frequenza"}]
 
 - "quantity": la grammatura/quantità indicata nel documento per quell'alimento, SEMPRE con un'unità o un riferimento esplicito — mai un numero da solo. Se il documento indica un peso usa "150 g"; se indica un numero di pezzi/unità (es. una banana, due uova) usa "1 banana", "2 uova" e non semplicemente "1" o "2" — il numero da solo è ambiguo (non si capisce se sono grammi o pezzi). Molti alimenti (es. verdure a quantità libera) non hanno una grammatura: in quel caso usa una stringa vuota "" e riporta comunque solo il nome dell'alimento, senza inventare un valore.
-- "category": una di queste quattro, quella più adatta: "Carboidrati", "Proteine", "Frutta e verdura", "Latticini". Se l'alimento non rientra chiaramente in nessuna, usa una stringa vuota "".
+- "category": una di queste sette, quella più adatta: "Carboidrati" (cereali, pane, pasta, riso, patate...), "Proteine" (carne, pesce, uova, tofu, seitan...), "Legumi" (fagioli, ceci, lenticchie...), "Grassi" (olio, frutta secca, semi, avocado, cioccolato fondente...), "Frutta", "Verdura", "Latticini" (formaggi, yogurt, latte...). Se l'alimento non rientra chiaramente in nessuna (es. sale, aceto, spezie), usa una stringa vuota "".
 - "maxPerWeek": quante volte massimo a settimana il documento indica per quell'alimento, una di queste stringhe esatte: "1", "2", "3", "sempre" (consentito esplicitamente tutti i giorni), "opzionale" (facoltativo/a piacere). Se il documento non specifica una frequenza, usa una stringa vuota "" — non inventare "sempre" quando non è indicato.
 
 Se il documento non è un piano alimentare o non contiene alimenti riconoscibili, rispondi con: []`;

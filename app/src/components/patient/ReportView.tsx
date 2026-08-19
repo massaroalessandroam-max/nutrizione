@@ -1,14 +1,16 @@
+import { useEffect, useState } from 'react';
 import type { AppState } from '../../types';
-import { MEAL_ORDER } from '../../types';
-import { badgeClass } from '../../lib/tone';
+import { api, type Report } from '../../api';
 import { PdfIcon, WhatsappIcon } from '../../icons';
+import { badgeClass } from '../../lib/tone';
+import { formatDateLabel } from '../../lib/mealMeta';
 import { buildReportWhatsappText, buildWhatsappLink } from '../../lib/whatsapp';
+import { buildReportPdf } from '../../lib/pdf';
+import { ReportCalendar, toISODate } from '../ReportCalendar';
 
 interface Props {
   state: AppState;
   onSetFreq: (freq: AppState['freq']) => void;
-  onExportPdf: () => void;
-  onSendWhatsapp: () => void;
 }
 
 const FREQ: Array<{ key: AppState['freq']; label: string; desc: string }> = [
@@ -18,14 +20,147 @@ const FREQ: Array<{ key: AppState['freq']; label: string; desc: string }> = [
   { key: 'manual', label: 'Solo manuale', desc: 'Invii tu quando vuoi' },
 ];
 
-export function ReportView({ state, onSetFreq, onExportPdf, onSendWhatsapp }: Props) {
-  const reportMeals = MEAL_ORDER.filter((k) => state.meals[k].done).map((k) => state.meals[k]);
-  const waHref = buildWhatsappLink(buildReportWhatsappText(state));
+type Preset = 'oggi' | 'ieri' | 'settimana' | 'mese' | 'anno';
+const PRESETS: Array<{ key: Preset; label: string }> = [
+  { key: 'oggi', label: 'Oggi' },
+  { key: 'ieri', label: 'Ieri' },
+  { key: 'settimana', label: 'Questa settimana' },
+  { key: 'mese', label: 'Questo mese' },
+  { key: 'anno', label: "Quest'anno" },
+];
+
+function presetRange(preset: Preset): { start: string; end: string } {
+  const today = new Date();
+  if (preset === 'oggi') return { start: toISODate(today), end: toISODate(today) };
+  if (preset === 'ieri') {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 1);
+    return { start: toISODate(d), end: toISODate(d) };
+  }
+  if (preset === 'settimana') {
+    const dow = (today.getDay() + 6) % 7; // 0 = lunedì
+    const monday = new Date(today);
+    monday.setDate(monday.getDate() - dow);
+    return { start: toISODate(monday), end: toISODate(today) };
+  }
+  if (preset === 'mese') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { start: toISODate(first), end: toISODate(today) };
+  }
+  const first = new Date(today.getFullYear(), 0, 1);
+  return { start: toISODate(first), end: toISODate(today) };
+}
+
+export function ReportView({ state, onSetFreq }: Props) {
+  const [preset, setPreset] = useState<Preset | null>('oggi');
+  const initial = presetRange('oggi');
+  const [rangeStart, setRangeStart] = useState(initial.start);
+  const [rangeEnd, setRangeEnd] = useState(initial.end);
+  // Data cliccata in attesa della seconda (per selezionare un intervallo sul
+  // calendario con due tap): null quando la selezione è già completa.
+  const [pendingStart, setPendingStart] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [activityDates, setActivityDates] = useState<Set<string>>(new Set());
+  const [report, setReport] = useState<Report | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; blob: Blob } | null>(null);
+
+  useEffect(() => {
+    const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
+    api.getReportActivity(monthKey).then((dates) => setActivityDates(new Set(dates))).catch(() => setActivityDates(new Set()));
+  }, [calendarMonth]);
+
+  useEffect(() => {
+    api.getReport(rangeStart, rangeEnd).then(setReport).catch(() => setReport(null));
+  }, [rangeStart, rangeEnd]);
+
+  // Rilascia l'URL del blob quando cambia o quando si chiude l'anteprima,
+  // altrimenti resta in memoria finché non si ricarica la pagina.
+  useEffect(() => () => { if (pdfPreview) URL.revokeObjectURL(pdfPreview.url); }, [pdfPreview]);
+
+  const applyPreset = (p: Preset) => {
+    setPreset(p);
+    setPendingStart(null);
+    const r = presetRange(p);
+    setRangeStart(r.start);
+    setRangeEnd(r.end);
+  };
+
+  const handleSelectDay = (iso: string) => {
+    setPreset(null);
+    if (pendingStart === null) {
+      setRangeStart(iso);
+      setRangeEnd(iso);
+      setPendingStart(iso);
+    } else if (iso < pendingStart) {
+      setRangeStart(iso);
+      setRangeEnd(iso);
+      setPendingStart(iso);
+    } else {
+      setRangeStart(pendingStart);
+      setRangeEnd(iso);
+      setPendingStart(null);
+    }
+  };
+
+  const openPdfPreview = () => {
+    if (!report) return;
+    const doc = buildReportPdf({
+      patientName: state.greetingName,
+      from: report.from,
+      to: report.to,
+      days: report.days,
+      adherencePct: report.adherencePct,
+      totalMeals: report.totalMeals,
+    });
+    const blob = doc.output('blob');
+    setPdfPreview({ url: URL.createObjectURL(blob), blob });
+  };
+
+  const closePdfPreview = () => setPdfPreview(null);
+
+  const downloadPdf = () => {
+    if (!pdfPreview || !report) return;
+    const a = document.createElement('a');
+    a.href = pdfPreview.url;
+    a.download = `report-nemis-${report.from}_${report.to}.pdf`;
+    a.click();
+  };
+
+  const shareSupported = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const sharePdf = async () => {
+    if (!pdfPreview || !report) return;
+    const file = new File([pdfPreview.blob], `report-nemis-${report.from}_${report.to}.pdf`, { type: 'application/pdf' });
+    try {
+      await navigator.share({ files: [file], title: 'Report Diario Nemis', text: `Report dal ${report.from} al ${report.to}` });
+    } catch {
+      // utente ha annullato la condivisione, o non supportata: nessun errore da mostrare
+    }
+  };
+
+  const waHref = report ? buildWhatsappLink(buildReportWhatsappText(report, state.greetingName)) : '';
+  const rangeLabel = rangeStart === rangeEnd ? formatDateLabel(rangeStart) : `${rangeStart} → ${rangeEnd}`;
 
   return (
     <div className="nm-section">
       <div className="nm-page-title">Report al nutrizionista</div>
       <div className="nm-page-sub">Decidi tu quando e come inviare il diario.</div>
+
+      <div className="nm-section-label">Periodo</div>
+      <div className="nm-chip-row">
+        {PRESETS.map((p) => (
+          <button key={p.key} className={`nm-chip ${preset === p.key ? 'is-on' : 'is-off'}`} onClick={() => applyPreset(p.key)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <ReportCalendar
+        month={calendarMonth}
+        onMonthChange={setCalendarMonth}
+        activityDates={activityDates}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        onSelectDay={handleSelectDay}
+      />
 
       <div className="nm-section-label">Quando inviare</div>
       <div className="nm-freq-list">
@@ -47,36 +182,59 @@ export function ReportView({ state, onSetFreq, onExportPdf, onSendWhatsapp }: Pr
 
       <div className="nm-report-preview">
         <div className="nm-report-preview-head">
-          <div className="nm-report-preview-head-title">Anteprima report · oggi</div>
-          <span className="nm-report-count">{state.doneCount} pasti</span>
+          <div className="nm-report-preview-head-title">Anteprima report · {rangeLabel}</div>
+          <span className="nm-report-count">{report?.totalMeals ?? 0} pasti</span>
         </div>
         <div className="nm-report-preview-body">
-          {reportMeals.map((m) => (
-            <div key={m.label} className="nm-report-meal-row">
-              <div>
-                <span className="nm-report-meal-name">{m.label}</span>{' '}
-                <span className="nm-report-meal-foods">· {m.foods.slice(0, 3).join(', ')}</span>
-              </div>
-              <span className={badgeClass(m.tone)}>{m.scoreLabel}</span>
+          {report && report.days.length === 0 && <div className="nm-hint">Nessun pasto registrato in questo periodo.</div>}
+          {report?.days.map((day) => (
+            <div key={day.date}>
+              <div className="nm-report-day-label">{formatDateLabel(day.date)}</div>
+              {day.meals.map((m) => (
+                <div key={m.key} className="nm-report-meal-row">
+                  <div>
+                    <span className="nm-report-meal-name">{m.label}</span>{' '}
+                    <span className="nm-report-meal-foods">· {m.foods.slice(0, 3).join(', ')}</span>
+                  </div>
+                  <span className={badgeClass(m.tone)}>{m.scoreLabel}</span>
+                </div>
+              ))}
             </div>
           ))}
-          <div className="nm-report-adherence">
-            <span>Aderenza giornata</span>
-            <span>{state.adherencePct}%</span>
-          </div>
+          {report && report.days.length > 0 && (
+            <div className="nm-report-adherence">
+              <span>Aderenza periodo</span>
+              <span>{report.adherencePct}%</span>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="nm-report-actions">
-        <button className="nm-btn-outline" onClick={onExportPdf}>
+        <button className="nm-btn-outline" onClick={openPdfPreview} disabled={!report}>
           <PdfIcon />
-          Esporta PDF
+          Pdf
         </button>
-        <a className="nm-btn-whatsapp" href={waHref} target="_blank" rel="noopener noreferrer" onClick={onSendWhatsapp}>
+        <a className="nm-btn-whatsapp" href={waHref} target="_blank" rel="noopener noreferrer">
           <WhatsappIcon />
           WhatsApp
         </a>
       </div>
+
+      {pdfPreview && (
+        <div className="nm-modal-overlay">
+          <div className="nm-pdf-modal-card">
+            <button className="nm-modal-close" onClick={closePdfPreview} aria-label="Chiudi anteprima">×</button>
+            <iframe src={pdfPreview.url} className="nm-pdf-iframe" title="Anteprima PDF report" />
+            <div className="nm-pdf-modal-actions">
+              <button className="nm-modal-btn nm-modal-btn-secondary" onClick={downloadPdf}>Scarica</button>
+              {shareSupported && (
+                <button className="nm-modal-btn nm-modal-btn-primary" onClick={sharePdf}>Condividi</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

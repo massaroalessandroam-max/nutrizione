@@ -268,6 +268,11 @@
   padding: 3px 9px; border-radius: 999px; font-weight: 600;
 }
 .nm-report-preview-body { padding: 8px 17px 14px; }
+.nm-report-day-label {
+  font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: .3px; margin: 12px 0 2px;
+}
+.nm-report-day-label:first-child { margin-top: 4px; }
 .nm-report-meal-row {
   display: flex; justify-content: space-between; align-items: center; padding: 9px 0;
   border-bottom: 1px solid rgba(11, 59, 74, .05);
@@ -291,6 +296,42 @@
   box-shadow: 0 8px 18px rgba(37, 211, 102, .3);
   text-decoration: none;
 }
+
+/* ===== Report calendar ===== */
+.nm-calendar { background: var(--card); border: 1px solid var(--line-soft); border-radius: 18px; padding: 14px; margin-bottom: 14px; }
+.nm-calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.nm-calendar-nav {
+  width: 30px; height: 30px; border-radius: 9px; border: none; background: var(--neutral-chip);
+  color: var(--ink-soft); font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.nm-calendar-month { font-weight: 600; font-size: 13.5px; text-transform: capitalize; }
+.nm-calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+  font-size: 10.5px; color: var(--ink-faint); font-weight: 600; margin-bottom: 4px;
+}
+.nm-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.nm-calendar-cell {
+  position: relative; aspect-ratio: 1; border: none; background: transparent; border-radius: 10px;
+  font-size: 12.5px; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.nm-calendar-cell.is-blank { cursor: default; }
+.nm-calendar-cell.is-today { font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--teal-700); }
+.nm-calendar-cell.is-in-range { background: var(--good-bg); border-radius: 0; }
+.nm-calendar-cell.is-edge { background: var(--teal-700); color: #fff; border-radius: 10px; font-weight: 700; }
+.nm-calendar-dot {
+  position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 999px; background: var(--gold-deep);
+}
+.nm-calendar-cell.is-edge .nm-calendar-dot { background: #fff; }
+
+/* ===== PDF preview modal ===== */
+.nm-pdf-modal-card {
+  position: relative; background: var(--card); border-radius: 20px; padding: 20px;
+  width: 100%; max-width: 480px; height: min(88vh, 760px);
+  display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-toast); animation: nm-rise .25s ease;
+}
+.nm-pdf-iframe { flex: 1; width: 100%; border: 1px solid var(--line-medium); border-radius: 12px; background: #fff; }
+.nm-pdf-modal-actions { display: flex; gap: 10px; }
 
 /* ===== Bottom nav ===== */
 .nm-bottom-nav {
@@ -544,6 +585,7 @@
 .nm-modal-btn { flex: 1; border: none; border-radius: 12px; padding: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer; }
 .nm-modal-btn-secondary { background: var(--neutral-chip); color: var(--ink); }
 .nm-modal-btn-danger { background: var(--bad-fg-strong); color: #fff; }
+.nm-modal-btn-primary { background: var(--teal-700); color: #fff; }
 @keyframes nm-spin { to { transform: rotate(360deg); } }
 
 /* ===== Nutritionist ===== */

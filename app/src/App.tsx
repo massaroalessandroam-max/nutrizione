@@ -9,25 +9,9 @@ import { PianoView } from './components/patient/PianoView';
 import { ReportView } from './components/patient/ReportView';
 import { LogSheet } from './components/sheet/LogSheet';
 import { SummaryOverlay } from './components/sheet/SummaryOverlay';
-import { generateDiarioPdf } from './lib/pdf';
-import { MEAL_ORDER } from './types';
 
 function App() {
   const d = useDiario();
-
-  const handleExportOwnPdf = () => {
-    if (!d.appState) return;
-    const s = d.appState;
-    generateDiarioPdf({
-      patientName: s.greetingName,
-      date: s.date,
-      adherencePct: s.adherencePct,
-      meals: MEAL_ORDER.filter((k) => s.meals[k].done).map((k) => ({
-        label: s.meals[k].label, time: s.meals[k].time, foods: s.meals[k].foods, scoreLabel: s.meals[k].scoreLabel,
-      })),
-    });
-    d.showToast('PDF del diario generato');
-  };
 
   return (
     <div className="nm-page">
@@ -57,14 +41,7 @@ function App() {
               {d.tab === 'premi' && <PremiView state={d.appState} />}
               {d.tab === 'digiuno' && <DigiunoView state={d.appState} onToggleFast={d.toggleFast} toggling={d.fastToggling} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
-              {d.tab === 'report' && (
-                <ReportView
-                  state={d.appState}
-                  onSetFreq={d.setFreq}
-                  onExportPdf={handleExportOwnPdf}
-                  onSendWhatsapp={() => d.showToast('Apertura WhatsApp…')}
-                />
-              )}
+              {d.tab === 'report' && <ReportView state={d.appState} onSetFreq={d.setFreq} />}
             </>
           )}
           {d.appState?.onboarded && <BottomNav tab={d.tab} onChange={d.setTab} />}

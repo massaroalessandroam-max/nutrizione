@@ -1,14 +1,16 @@
-import type { AppState, MealKey } from '../types';
-import { MEAL_ORDER } from '../types';
+import type { Report } from '../api';
 
-export function buildReportWhatsappText(state: AppState): string {
-  const lines = [`*Diario Nemis* — ${state.greetingName}, ${state.date}`, ''];
-  for (const key of MEAL_ORDER as MealKey[]) {
-    const m = state.meals[key];
-    if (!m.done) continue;
-    lines.push(`${m.label} (${m.time}): ${m.foods.join(', ')} — ${m.scoreLabel}`);
+export function buildReportWhatsappText(report: Report, patientName: string): string {
+  const range = report.from === report.to ? report.from : `dal ${report.from} al ${report.to}`;
+  const lines = [`*Diario Nemis* — ${patientName}, ${range}`, ''];
+  for (const day of report.days) {
+    lines.push(`*${day.date}*`);
+    for (const m of day.meals) {
+      lines.push(`${m.label} (${m.time}): ${m.foods.join(', ')} — ${m.scoreLabel}`);
+    }
+    lines.push('');
   }
-  lines.push('', `Aderenza giornata: ${state.adherencePct}%`);
+  lines.push(`Pasti registrati: ${report.totalMeals} · Aderenza media: ${report.adherencePct}%`);
   return lines.join('\n');
 }
 

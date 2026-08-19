@@ -1,4 +1,4 @@
-import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, Schedule, FastingPref } from './types';
+import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, Schedule, FastingPref, Tone } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -35,9 +35,11 @@ export const api = {
     req<string[]>('/meal-photo/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
   getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
+  getReportActivity: (month: string) => req<string[]>(`/report/activity?month=${month}`),
+  getReport: (from: string, to: string) => req<Report>(`/report?from=${from}&to=${to}`),
 };
 
-export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Frutta e verdura', 'Latticini'] as const;
+export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
 export const MAX_PER_WEEK_OPTIONS = ['1', '2', '3', 'sempre', 'opzionale'] as const;
 export type MaxPerWeek = (typeof MAX_PER_WEEK_OPTIONS)[number];
 
@@ -56,3 +58,25 @@ export interface PlanUpload {
 }
 
 export const planUploadDownloadUrl = (id: number) => `/api/plan/uploads/${id}/download`;
+
+export interface ReportMeal {
+  key: MealKey;
+  label: string;
+  time: string;
+  foods: string[];
+  scoreLabel: string;
+  tone: Tone;
+}
+
+export interface ReportDay {
+  date: string;
+  meals: ReportMeal[];
+}
+
+export interface Report {
+  from: string;
+  to: string;
+  days: ReportDay[];
+  totalMeals: number;
+  adherencePct: number;
+}
