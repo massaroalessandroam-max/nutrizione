@@ -149,6 +149,12 @@ export function useDiario() {
     showToast('Pasto rimosso');
   }, [showToast]);
 
+  const updateMealFoods = useCallback(async (key: MealKey, foods: string[]) => {
+    const s = await api.updateMealFoods(key, foods);
+    setAppState(s);
+    showToast('Pasto aggiornato');
+  }, [showToast]);
+
   const skipMeal = useCallback(async (key: MealKey, skipped: boolean) => {
     const s = await api.skipMeal(key, skipped);
     setAppState(s);
@@ -189,6 +195,7 @@ export function useDiario() {
     toast, showToast,
     completeOnboarding,
     deleteMeal,
+    updateMealFoods,
     skipMeal,
     toggleFast, setFreq, goDigiuno,
     patients, activePatientId, activePatient, selectPatient, backToList,

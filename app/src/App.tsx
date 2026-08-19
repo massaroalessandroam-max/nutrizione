@@ -88,6 +88,7 @@ function App() {
             photoError={d.photoError}
             onAddPhoto={d.addPhoto}
             onRetakePhoto={d.retakePhoto}
+            onUpdateFoods={d.updateMealFoods}
             onClose={d.closeSheet}
             onSubmit={d.submitLog}
           />

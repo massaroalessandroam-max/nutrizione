@@ -16,6 +16,8 @@ export const api = {
   getState: () => req<AppState>('/state'),
   logMeal: (key: MealKey, foods: string[]) =>
     req<LogResponse>(`/meals/${key}/log`, { method: 'POST', body: JSON.stringify({ foods }) }),
+  updateMealFoods: (key: MealKey, foods: string[]) =>
+    req<AppState>(`/meals/${key}/log`, { method: 'PUT', body: JSON.stringify({ foods }) }),
   deleteMeal: (key: MealKey) => req<AppState>(`/meals/${key}/log`, { method: 'DELETE' }),
   skipMeal: (key: MealKey, skipped: boolean) =>
     req<AppState>(`/meals/${key}/skip`, { method: 'PUT', body: JSON.stringify({ skipped }) }),

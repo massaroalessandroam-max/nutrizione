@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import type { LogMode } from '../../hooks/useDiario';
-import { MicIcon, ModeIcon, CameraIcon } from '../../icons';
+import { MicIcon, ModeIcon, CameraIcon, ChevronIcon, TrashIcon } from '../../icons';
 import { useSpeechRecognition, speechRecognitionSupported } from '../../hooks/useSpeechRecognition';
 import { api, PLAN_CATEGORIES, type PlanItem } from '../../api';
 
@@ -32,6 +32,7 @@ interface Props {
   photoError: string;
   onAddPhoto: (file: File) => void;
   onRetakePhoto: () => void;
+  onUpdateFoods: (key: MealKey, foods: string[]) => void;
   onClose: () => void;
   onSubmit: () => void;
 }
@@ -39,17 +40,24 @@ interface Props {
 export function LogSheet({
   open, state, activeMeal, onSelectMeal, lockMeal, mode, onSelectMode,
   logText, onLogTextChange, hasTranscript, onTranscript,
-  photoFoods, photoExtracting, photoError, onAddPhoto, onRetakePhoto, onClose, onSubmit,
+  photoFoods, photoExtracting, photoError, onAddPhoto, onRetakePhoto, onUpdateFoods, onClose, onSubmit,
 }: Props) {
   const { recording, error, start, stop } = useSpeechRecognition();
 
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expandedSuggestionCats, setExpandedSuggestionCats] = useState<Set<string>>(new Set());
   // Suggerimenti selezionati dal piano: quantità modificabile per voce, e
   // un click li aggiunge al testo una sola volta (riclick li toglie)
   // invece di duplicarli ad ogni tocco.
   const [suggestionQty, setSuggestionQty] = useState<Record<string, string>>({});
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+
+  // Copia locale modificabile degli alimenti già registrati oggi per il
+  // pasto attivo: null se il pasto non è ancora fatto. Si risincronizza
+  // solo al cambio pasto/apertura, non ad ogni aggiornamento di stato,
+  // altrimenti una modifica in corso verrebbe persa.
+  const [editedFoods, setEditedFoods] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!open) stop();
@@ -58,11 +66,29 @@ export function LogSheet({
   useEffect(() => {
     if (open) {
       api.getPlan().then(setPlanItems).catch(() => setPlanItems([]));
+      setEditedFoods(state.meals[activeMeal].done ? [...state.meals[activeMeal].foods] : null);
     } else {
       setShowSuggestions(false);
+      setExpandedSuggestionCats(new Set());
       setSelectedSuggestions(new Set());
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeMeal]);
+
+  const toggleSuggestionCategory = (cat: string) =>
+    setExpandedSuggestionCats((s) => {
+      const next = new Set(s);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+
+  const updateEditedFood = (i: number, value: string) =>
+    setEditedFoods((f) => f?.map((x, idx) => (idx === i ? value : x)) ?? f);
+  const removeEditedFood = (i: number) => setEditedFoods((f) => f?.filter((_, idx) => idx !== i) ?? f);
+  const foodsAreDirty = editedFoods !== null && JSON.stringify(editedFoods) !== JSON.stringify(state.meals[activeMeal].foods);
+  const saveEditedFoods = () => {
+    if (editedFoods) onUpdateFoods(activeMeal, editedFoods.map((f) => f.trim()).filter(Boolean));
+  };
 
   const segmentFor = (name: string, qty: string) => (qty.trim() ? `${name} ${qty.trim()}` : name);
 
@@ -142,8 +168,21 @@ export function LogSheet({
           </div>
         )}
 
-        {state.meals[activeMeal].done && (
-          <div className="nm-hint">Già registrato oggi: {state.meals[activeMeal].foods.join(', ')}. Quello che aggiungi ora si somma.</div>
+        {editedFoods !== null && (
+          <div className="nm-logged-foods">
+            <div className="nm-hint">Già registrato oggi — modifica o rimuovi una voce, o aggiungi altro qui sotto (si somma):</div>
+            {editedFoods.map((food, i) => (
+              <div key={i} className="nm-logged-food-row">
+                <input className="nm-text-input" value={food} onChange={(e) => updateEditedFood(i, e.target.value)} />
+                <button className="nm-plan-row-icon-btn" onClick={() => removeEditedFood(i)} aria-label="Rimuovi alimento">
+                  <TrashIcon size={15} />
+                </button>
+              </div>
+            ))}
+            {foodsAreDirty && (
+              <button className="nm-onboard-add-btn" onClick={saveEditedFoods}>Salva modifiche</button>
+            )}
+          </div>
         )}
 
         <div className="nm-mode-tabs">
@@ -171,10 +210,14 @@ export function LogSheet({
                     cat === SUGGESTION_OTHER ? !(PLAN_CATEGORIES as readonly string[]).includes(it.category) : it.category === cat
                   );
                   if (!catItems.length) return null;
+                  const isOpen = expandedSuggestionCats.has(cat);
                   return (
                     <div key={cat} className="nm-suggestions-group">
-                      <div className="nm-suggestions-group-title">{cat}</div>
-                      {catItems.map((it) => (
+                      <button className="nm-suggestions-group-head" onClick={() => toggleSuggestionCategory(cat)}>
+                        <span>{cat}<span className="nm-plan-category-count"> · {catItems.length}</span></span>
+                        <ChevronIcon size={14} open={isOpen} />
+                      </button>
+                      {isOpen && catItems.map((it) => (
                         <div key={it.name} className={`nm-suggestions-row ${selectedSuggestions.has(it.name) ? 'is-on' : ''}`}>
                           <button className="nm-suggestions-row-name" onClick={() => toggleSuggestion(it)}>
                             {it.name}

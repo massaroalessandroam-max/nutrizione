@@ -231,6 +231,39 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
   res.json({ state: await buildState(), summary });
 });
 
+// Sostituisce l'intero elenco di alimenti già registrati per il pasto oggi
+// (a differenza di POST, che aggiunge) — usato per modificare il testo di
+// una voce o cancellarne una singola da quelle già fatte, invece di dover
+// cancellare tutto il pasto e ricominciare.
+stateRouter.put('/meals/:key/log', async (req, res) => {
+  const { key } = req.params;
+  if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
+  const foods: string[] = Array.isArray(req.body?.foods)
+    ? req.body.foods.map((f: unknown) => String(f).trim()).filter(Boolean)
+    : [];
+
+  const date = todayStr();
+  const { rows } = await db.execute({
+    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
+    args: [date, key],
+  });
+  const existingFoods: string[] = rows[0] ? JSON.parse((rows[0] as any).foods) : [];
+
+  const ctx = await loadMatchContext(date);
+  const oldPts = pointsForFoods(existingFoods, ctx);
+  const newPts = pointsForFoods(foods, ctx);
+  await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ? + ?) WHERE id = 1', args: [oldPts, newPts] });
+
+  const time = new Date().toTimeString().slice(0, 5);
+  await db.execute({
+    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, ?, ?, 0)
+          ON CONFLICT(date, meal_key) DO UPDATE SET done = excluded.done, foods = excluded.foods, time = excluded.time, skipped = 0`,
+    args: [date, key, foods.length ? 1 : 0, JSON.stringify(foods), foods.length ? time : ''],
+  });
+
+  res.json(await buildState());
+});
+
 stateRouter.delete('/meals/:key/log', async (req, res) => {
   const { key } = req.params;
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });

@@ -63,7 +63,7 @@ Analizza TUTTE le pagine del documento ed estrai l'elenco completo degli aliment
 Rispondi ESCLUSIVAMENTE con un array JSON valido, senza testo aggiuntivo prima o dopo, in questo formato esatto:
 [{"name": "nome alimento", "quantity": "quantità, es. 150 g", "category": "categoria", "maxPerWeek": "frequenza"}]
 
-- "quantity": la grammatura/quantità indicata nel documento per quell'alimento. Molti alimenti (es. verdure a quantità libera) non hanno una grammatura: in quel caso usa una stringa vuota "" e riporta comunque solo il nome dell'alimento, senza inventare un valore.
+- "quantity": la grammatura/quantità indicata nel documento per quell'alimento, SEMPRE con un'unità o un riferimento esplicito — mai un numero da solo. Se il documento indica un peso usa "150 g"; se indica un numero di pezzi/unità (es. una banana, due uova) usa "1 banana", "2 uova" e non semplicemente "1" o "2" — il numero da solo è ambiguo (non si capisce se sono grammi o pezzi). Molti alimenti (es. verdure a quantità libera) non hanno una grammatura: in quel caso usa una stringa vuota "" e riporta comunque solo il nome dell'alimento, senza inventare un valore.
 - "category": una di queste quattro, quella più adatta: "Carboidrati", "Proteine", "Frutta e verdura", "Latticini". Se l'alimento non rientra chiaramente in nessuna, usa una stringa vuota "".
 - "maxPerWeek": quante volte massimo a settimana il documento indica per quell'alimento, una di queste stringhe esatte: "1", "2", "3", "sempre" (consentito esplicitamente tutti i giorni), "opzionale" (facoltativo/a piacere). Se il documento non specifica una frequenza, usa una stringa vuota "" — non inventare "sempre" quando non è indicato.
 
