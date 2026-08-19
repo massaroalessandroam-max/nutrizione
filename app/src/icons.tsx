@@ -143,6 +143,23 @@ export function TrashIcon({ size = 16, color = 'currentColor' }: IconProps) {
   );
 }
 
+export function PencilIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+export function ChevronIcon({ size = 16, color = 'currentColor', open = false }: IconProps & { open?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2}
+      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 export function MinusCircleIcon({ size = 16, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>

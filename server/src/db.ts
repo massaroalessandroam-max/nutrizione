@@ -127,12 +127,12 @@ export async function initDb(): Promise<void> {
       name TEXT NOT NULL,
       quantity TEXT NOT NULL,
       category TEXT NOT NULL DEFAULT '',
-      max_per_week TEXT NOT NULL DEFAULT 'sempre'
+      max_per_week TEXT NOT NULL DEFAULT ''
     );
   `);
   for (const migration of [
     "ALTER TABLE nutrition_plan_items ADD COLUMN category TEXT NOT NULL DEFAULT ''",
-    "ALTER TABLE nutrition_plan_items ADD COLUMN max_per_week TEXT NOT NULL DEFAULT 'sempre'",
+    "ALTER TABLE nutrition_plan_items ADD COLUMN max_per_week TEXT NOT NULL DEFAULT ''",
   ]) {
     try {
       await db.execute(migration);
@@ -140,6 +140,19 @@ export async function initDb(): Promise<void> {
       // colonna già presente
     }
   }
+
+  // Archivio dei documenti piano caricati (PDF/foto), come log — al
+  // ricaricare un piano nuovo i dati estratti (nutrition_plan_items) vengono
+  // sostituiti, ma il file resta salvato qui con la data di caricamento.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS plan_uploads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      data_base64 TEXT NOT NULL,
+      uploaded_at TEXT NOT NULL
+    );
+  `);
 
   await ensureAppStateRow();
 }

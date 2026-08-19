@@ -387,29 +387,38 @@
 .nm-onboard-fast-range > div { flex: 1; }
 .nm-onboard-fast-label { font-size: 12px; color: var(--ink-faint); margin-bottom: 4px; }
 
-.nm-plan-item-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-.nm-plan-qty-input { max-width: 110px; flex: none; }
-.nm-plan-item-row .nm-onboard-remove-btn { margin-top: 0; }
 .nm-plan-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
-.nm-plan-group-title {
-  font-size: 12.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
-  letter-spacing: .3px; margin: 18px 0 9px;
-}
 .nm-plan-item-card { border: 1.5px solid var(--line-medium); border-radius: 14px; padding: 10px; margin-bottom: 9px; background: var(--card); }
 .nm-plan-item-top { display: flex; align-items: center; gap: 8px; }
 .nm-plan-item-bottom { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .nm-plan-item-bottom > * { flex: 1 1 110px; min-width: 0; }
-.nm-plan-item-top .nm-onboard-remove-btn { margin-top: 0; }
 .nm-plan-pdf-btn {
   display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--line-strong); border-radius: 9px;
   background: var(--card); color: var(--teal-700); font-size: 12.5px; font-weight: 600; padding: 6px 11px; cursor: pointer;
 }
-.nm-shopping-row {
-  display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
-  border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
+
+.nm-plan-category { border: 1.5px solid var(--line-medium); border-radius: 14px; margin-bottom: 10px; overflow: hidden; background: var(--card); }
+.nm-plan-category-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; border: none; cursor: pointer;
+  background: transparent; padding: 13px 14px; font-weight: 700; font-size: 14px; color: var(--ink);
 }
-.nm-shopping-row:last-child { border-bottom: none; }
-.nm-shopping-qty { color: var(--ink-soft); font-weight: 600; }
+.nm-plan-category-count { font-weight: 500; color: var(--ink-faint); font-size: 12.5px; }
+.nm-plan-category-body { padding: 2px 10px 10px; }
+.nm-plan-row { display: flex; align-items: center; gap: 6px; padding: 9px 2px; border-top: 1px solid var(--line-soft); }
+.nm-plan-row:first-child { border-top: none; }
+.nm-plan-row-icon-btn { border: none; background: transparent; color: var(--ink-faint); cursor: pointer; padding: 4px; flex: none; display: flex; }
+.nm-plan-row-main { flex: 1; display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 6px; align-items: center; min-width: 0; }
+.nm-plan-row-name { font-weight: 600; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-plan-row-qty { font-size: 12.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-plan-row-freq { font-size: 12.5px; color: var(--ink-soft); line-height: 1.25; }
+
+.nm-upload-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; text-decoration: none;
+  border: 1.5px solid var(--line-medium); border-radius: 12px; margin-bottom: 8px; color: inherit;
+}
+.nm-upload-name { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+.nm-upload-date { font-size: 12px; color: var(--ink-faint); }
+
 .nm-plan-error {
   background: var(--bad-bg); color: var(--bad-fg); border-radius: 12px; padding: 11px 14px;
   font-size: 13px; font-weight: 600; margin: 12px 0;
@@ -468,6 +477,32 @@
   font-size: 13.5px; font-weight: 500; box-shadow: var(--shadow-toast); animation: nm-rise .3s ease;
   display: flex; align-items: center; gap: 8px; white-space: nowrap;
 }
+
+/* ===== Modal ===== */
+.nm-modal-overlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(11, 59, 74, .55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.nm-modal-card {
+  position: relative; background: var(--card); border-radius: 20px; padding: 40px 28px 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  max-width: 320px; width: 100%; box-shadow: var(--shadow-toast); animation: nm-rise .25s ease;
+}
+.nm-modal-close {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border: none;
+  border-radius: 10px; background: var(--neutral-chip); color: var(--ink-soft);
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.nm-spinner {
+  width: 44px; height: 44px; border: 4px solid var(--line-medium); border-top-color: var(--teal-700);
+  border-radius: 50%; animation: nm-spin .8s linear infinite;
+}
+.nm-modal-text { font-size: 14.5px; font-weight: 600; color: var(--ink); text-align: center; }
+.nm-modal-actions { display: flex; gap: 10px; width: 100%; }
+.nm-modal-btn { flex: 1; border: none; border-radius: 12px; padding: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer; }
+.nm-modal-btn-secondary { background: var(--neutral-chip); color: var(--ink); }
+.nm-modal-btn-danger { background: var(--bad-fg-strong); color: #fff; }
+@keyframes nm-spin { to { transform: rotate(360deg); } }
 
 /* ===== Nutritionist ===== */
 .nm-nutri-body { padding: 6px 20px 24px; min-height: 820px; }

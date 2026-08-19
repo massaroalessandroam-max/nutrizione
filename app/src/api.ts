@@ -26,8 +26,9 @@ export const api = {
     req<AppState>('/onboarding', { method: 'POST', body: JSON.stringify({ name, schedule, snacks, fasting }) }),
   getPlan: () => req<PlanItem[]>('/plan'),
   savePlan: (items: PlanItem[]) => req<PlanItem[]>('/plan', { method: 'POST', body: JSON.stringify({ items }) }),
-  extractPlan: (fileBase64: string, mediaType: string) =>
-    req<PlanItem[]>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
+  extractPlan: (fileBase64: string, mediaType: string, filename: string, signal?: AbortSignal) =>
+    req<PlanItem[]>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType, filename }), signal }),
+  getPlanUploads: () => req<PlanUpload[]>('/plan/uploads'),
   extractMealPhoto: (fileBase64: string, mediaType: string) =>
     req<string[]>('/meal-photo/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
@@ -44,3 +45,12 @@ export interface PlanItem {
   category: string;
   maxPerWeek: string;
 }
+
+export interface PlanUpload {
+  id: number;
+  filename: string;
+  mediaType: string;
+  uploadedAt: string;
+}
+
+export const planUploadDownloadUrl = (id: number) => `/api/plan/uploads/${id}/download`;
