@@ -28,6 +28,8 @@ export interface Badge {
   desc: string;
   icon: string;
   earned: boolean;
+  current: number;
+  target: number;
 }
 
 export interface MealScheduleEntry {

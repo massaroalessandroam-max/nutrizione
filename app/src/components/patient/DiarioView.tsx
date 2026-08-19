@@ -73,9 +73,9 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
         {visibleMeals.map((key) => {
           const meal = state.meals[key];
           return (
-            <div key={key} className="nm-meal-card">
+            <div key={key} className={`nm-meal-card ${meal.done ? 'is-done' : ''}`}>
               <button className="nm-meal-card-main" onClick={() => onOpenMeal(key)}>
-                <div className="nm-meal-icon" style={{ background: meal.done ? 'var(--good-bg)' : 'var(--neutral-chip)' }}>
+                <div className="nm-meal-icon" style={{ background: meal.done ? 'var(--card)' : 'var(--neutral-chip)' }}>
                   <span style={{ color: meal.done ? 'var(--teal-900)' : 'var(--ink-faint)' }}>{MEAL_SHORT[key]}</span>
                 </div>
                 <div className="nm-meal-body">
@@ -84,7 +84,9 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
                     <span className="nm-meal-time">{meal.time}</span>
                   </div>
                   <div className="nm-meal-preview">
-                    {meal.done ? meal.foods.join(', ') : meal.skipped ? 'Saltato oggi' : 'Tocca per registrare'}
+                    {meal.done
+                      ? `+${meal.foods.length} ${meal.foods.length === 1 ? 'alimento' : 'alimenti'}`
+                      : meal.skipped ? 'Saltato oggi' : 'Tocca per registrare'}
                   </div>
                 </div>
                 {meal.done ? (
@@ -125,14 +127,16 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
         })}
       </div>
 
-      <button className="nm-fast-mini" onClick={onGoDigiuno}>
-        <ClockIcon />
-        <div className="nm-fast-mini-body">
-          <div className="nm-fast-mini-title">Digiuno intermittente</div>
-          <div className="nm-fast-mini-sub">{state.fastActive ? `In corso · ${h}h ${String(m).padStart(2, '0')}m` : 'Non attivo'}</div>
-        </div>
-        <span className="nm-fast-mini-pct">{Math.round(fastPct * 100)}%</span>
-      </button>
+      {state.fastActive && (
+        <button className="nm-fast-mini" onClick={onGoDigiuno}>
+          <ClockIcon size={15} color="var(--teal-700)" />
+          <div className="nm-fast-mini-body">
+            <div className="nm-fast-mini-title">Digiuno in corso</div>
+            <div className="nm-fast-mini-sub">{h}h {String(m).padStart(2, '0')}m</div>
+          </div>
+          <span className="nm-fast-mini-pct">{Math.round(fastPct * 100)}%</span>
+        </button>
+      )}
 
       <button className="nm-cta" onClick={onOpenLogQuick}>
         <PlusIcon size={19} color="#fff" />

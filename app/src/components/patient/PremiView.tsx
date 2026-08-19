@@ -53,6 +53,14 @@ export function PremiView({ state }: Props) {
             <div className="nm-badge-icon" style={{ background: b.earned ? 'var(--gold-tint)' : 'rgba(11,59,74,.06)' }}>{b.icon}</div>
             <div className="nm-badge-name">{b.name}</div>
             <div className="nm-badge-desc">{b.desc}</div>
+            {!b.earned && (
+              <div className="nm-badge-progress">
+                <div className="nm-badge-progress-track">
+                  <div className="nm-badge-progress-fill" style={{ width: `${Math.min(100, Math.round((b.current / b.target) * 100))}%` }} />
+                </div>
+                <div className="nm-badge-progress-label">{Math.min(b.current, b.target)}/{b.target}</div>
+              </div>
+            )}
           </div>
         ))}
       </div>

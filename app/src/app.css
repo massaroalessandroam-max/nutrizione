@@ -1,20 +1,31 @@
-/* ===== Shell ===== */
+/* ===== Shell =====
+   Mobile-first: di base l'app riempie lo schermo, senza bordi/ombra, come
+   una vera app (non un mockup). Solo da tablet in su (uso da browser
+   desktop) torna a essere una "card" telefono centrata con margine e ombra
+   — è lì che serve vedere i bordi del dispositivo, non su un telefono
+   vero. */
 .nm-page {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 22px 16px;
 }
 .nm-shell {
   width: 100%;
   max-width: 452px;
   background: var(--app-surface);
-  border-radius: 30px;
-  box-shadow: var(--shadow-shell);
-  overflow: hidden;
   position: relative;
-  min-height: 900px;
+  min-height: 100vh;
+}
+
+@media (min-width: 560px) {
+  .nm-page { padding: 22px 16px; }
+  .nm-shell {
+    border-radius: 30px;
+    box-shadow: var(--shadow-shell);
+    overflow: hidden;
+    min-height: 900px;
+  }
 }
 
 /* ===== Role switch ===== */
@@ -105,6 +116,12 @@
   background: var(--card); border: 1px solid var(--line-soft);
   border-radius: 16px; padding: 12px 14px;
 }
+/* Un pasto già registrato ha un colore diverso, come un pulsante premuto —
+   distingue a colpo d'occhio "fatto" da "da fare" nella lista. */
+.nm-meal-card.is-done {
+  background: var(--good-bg); border-color: var(--border-subtle);
+  box-shadow: inset 0 1px 2px rgba(11, 59, 74, .1);
+}
 .nm-meal-card-main {
   display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0;
   background: none; border: none; padding: 0; cursor: pointer; text-align: left;
@@ -137,16 +154,20 @@
 .nm-badge-ok { background: var(--ok-bg); color: var(--ok-fg); }
 .nm-badge-bad { background: var(--bad-bg); color: var(--bad-fg); }
 
-/* ===== Fasting mini card ===== */
+/* ===== Fasting mini pill =====
+   Opzionale e secondario rispetto al diario pasti: compare solo mentre un
+   digiuno è davvero in corso (avviato dalla tab Digiuno), come una pillola
+   piccola invece di una card scura a piena larghezza — non deve competere
+   in peso visivo con la ring card principale. */
 .nm-fast-mini {
-  margin-top: 11px; width: 100%; background: var(--dark-surface); border: none;
-  border-radius: 18px; padding: 15px 16px; display: flex; align-items: center; gap: 13px;
-  cursor: pointer; color: #fff;
+  margin-top: 11px; background: var(--neutral-chip); border: none;
+  border-radius: 999px; padding: 8px 14px; display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; color: var(--ink);
 }
-.nm-fast-mini-body { flex: 1; text-align: left; }
-.nm-fast-mini-title { font-weight: 600; font-size: 14px; }
-.nm-fast-mini-sub { font-size: 12px; color: var(--ink-on-dark-soft); }
-.nm-fast-mini-pct { font-size: 15px; font-weight: 700; color: var(--gold); }
+.nm-fast-mini-body { text-align: left; }
+.nm-fast-mini-title { font-weight: 600; font-size: 12px; }
+.nm-fast-mini-sub { font-size: 11px; color: var(--ink-faint); }
+.nm-fast-mini-pct { font-size: 12.5px; font-weight: 700; color: var(--teal-700); }
 
 /* ===== CTA ===== */
 .nm-cta {
@@ -190,6 +211,10 @@
 }
 .nm-badge-name { font-weight: 600; font-size: 13.5px; }
 .nm-badge-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; line-height: 1.35; }
+.nm-badge-progress { margin-top: 9px; }
+.nm-badge-progress-track { height: 5px; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
+.nm-badge-progress-fill { height: 100%; background: var(--teal-700); border-radius: 999px; }
+.nm-badge-progress-label { font-size: 10.5px; font-weight: 600; color: var(--ink-faint); margin-top: 4px; }
 
 /* ===== Digiuno ===== */
 .nm-fast-card {

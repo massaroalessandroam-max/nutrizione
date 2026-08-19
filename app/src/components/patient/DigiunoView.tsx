@@ -13,7 +13,10 @@ function fmtClock(d: Date): string {
 
 export function DigiunoView({ state, onToggleFast }: Props) {
   const now = useNow(state.fastActive);
-  const elapsedMs = Math.max(0, now - state.fastStart);
+  // Da fermo l'elapsed non deve contare dal vecchio fastStart (rimasto in
+  // memoria per calcolare i punti di un digiuno concluso) — altrimenti
+  // sembra ancora in corso anche a digiuno fermato.
+  const elapsedMs = state.fastActive ? Math.max(0, now - state.fastStart) : 0;
   const h = Math.floor(elapsedMs / 3600000);
   const m = Math.floor((elapsedMs % 3600000) / 60000);
   const sec = Math.floor((elapsedMs % 60000) / 1000);
@@ -37,16 +40,18 @@ export function DigiunoView({ state, onToggleFast }: Props) {
         </button>
       </div>
 
-      <div className="nm-fast-info-row">
-        <div className="nm-fast-info-card">
-          <div className="nm-fast-info-label">Inizio digiuno</div>
-          <div className="nm-fast-info-value">{fmtClock(startD)}</div>
+      {state.fastActive && (
+        <div className="nm-fast-info-row">
+          <div className="nm-fast-info-card">
+            <div className="nm-fast-info-label">Inizio digiuno</div>
+            <div className="nm-fast-info-value">{fmtClock(startD)}</div>
+          </div>
+          <div className="nm-fast-info-card">
+            <div className="nm-fast-info-label">Prossimo pasto</div>
+            <div className="nm-fast-info-value">{fmtClock(endD)}</div>
+          </div>
         </div>
-        <div className="nm-fast-info-card">
-          <div className="nm-fast-info-label">Prossimo pasto</div>
-          <div className="nm-fast-info-value">{fmtClock(endD)}</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

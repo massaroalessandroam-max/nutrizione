@@ -83,6 +83,8 @@ export interface Badge {
   desc: string;
   icon: string;
   earned: boolean;
+  current: number;
+  target: number;
 }
 
 export async function computeBadges(streak: number): Promise<Badge[]> {
@@ -106,9 +108,9 @@ export async function computeBadges(streak: number): Promise<Badge[]> {
   }
 
   return [
-    { key: 'week1', name: 'Prima settimana', desc: '7 giorni consecutivi', icon: '🌱', earned: streak >= 7 },
-    { key: 'breakfast', name: 'Colazione top', desc: '10 colazioni consigliate', icon: '☀️', earned: goodBreakfasts >= 10 },
-    { key: 'variety', name: 'Varietà', desc: '20 alimenti consigliati diversi', icon: '🥗', earned: goodFoods.size >= 20 },
-    { key: 'consistency', name: 'Costanza', desc: '30 giorni · in corso', icon: '🏆', earned: streak >= 30 },
+    { key: 'week1', name: 'Prima settimana', desc: '7 giorni consecutivi', icon: '🌱', earned: streak >= 7, current: streak, target: 7 },
+    { key: 'breakfast', name: 'Colazione top', desc: '10 colazioni consigliate', icon: '☀️', earned: goodBreakfasts >= 10, current: goodBreakfasts, target: 10 },
+    { key: 'variety', name: 'Varietà', desc: '20 alimenti consigliati diversi', icon: '🥗', earned: goodFoods.size >= 20, current: goodFoods.size, target: 20 },
+    { key: 'consistency', name: 'Costanza', desc: '30 giorni · in corso', icon: '🏆', earned: streak >= 30, current: streak, target: 30 },
   ];
 }
