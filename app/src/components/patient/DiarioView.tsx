@@ -59,17 +59,37 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
       </div>
 
       <div className="nm-ring-card">
-        <RingSvg size={112} radius={48} strokeWidth={10} progress={shownCount / activeCount} trackColor="rgba(255,255,255,.22)" progressColor="var(--gold)">
-          <span className="nm-ring-count">{shownCount}/{activeCount}</span>
-          <span className="nm-ring-unit">PASTI</span>
-        </RingSvg>
-        <div className="nm-ring-info">
-          <div className="nm-day-headline">{dayHeadline}</div>
-          <div className="nm-day-sub">{daySub}</div>
-          <div className="nm-week-row">
-            <div className="nm-week-labels"><span>Obiettivo settimana</span><span>{weekPct}</span></div>
-            <div className="nm-week-track"><div className="nm-week-fill" style={{ width: weekPct }} /></div>
+        <div className="nm-ring-top">
+          <RingSvg size={112} radius={48} strokeWidth={10} progress={shownCount / activeCount} trackColor="rgba(255,255,255,.22)" progressColor="var(--gold)">
+            <span className="nm-ring-count">{shownCount}/{activeCount}</span>
+            <span className="nm-ring-unit">PASTI</span>
+          </RingSvg>
+          <div className="nm-ring-info">
+            <div className="nm-day-headline">{dayHeadline}</div>
+            <div className="nm-day-sub">{daySub}</div>
+            <div className="nm-week-row">
+              <div className="nm-week-labels"><span>Obiettivo settimana</span><span>{weekPct}</span></div>
+              <div className="nm-week-track"><div className="nm-week-fill" style={{ width: weekPct }} /></div>
+            </div>
           </div>
+        </div>
+        <div className="nm-week-days-row">
+          {state.week.map((d) => {
+            // Cerchio pieno (oro) solo se il giorno è completo; altrimenti
+            // più denso quanti più pasti mancano, non solo acceso/spento.
+            const complete = d.doneCount >= activeCount;
+            const density = Math.min(1, Math.max(0, activeCount - d.doneCount) / activeCount);
+            return (
+              <div
+                key={d.date}
+                className={`nm-week-day-circle ${complete ? 'is-complete' : ''} ${d.isToday ? 'is-today' : ''}`}
+                style={complete ? undefined : { background: `rgba(255,255,255,${(0.14 + density * 0.4).toFixed(2)})` }}
+                title={`${d.doneCount}/${activeCount} pasti`}
+              >
+                {d.dayLabel}
+              </div>
+            );
+          })}
         </div>
       </div>
 
