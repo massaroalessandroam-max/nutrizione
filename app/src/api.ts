@@ -28,11 +28,19 @@ export const api = {
   savePlan: (items: PlanItem[]) => req<PlanItem[]>('/plan', { method: 'POST', body: JSON.stringify({ items }) }),
   extractPlan: (fileBase64: string, mediaType: string) =>
     req<PlanItem[]>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
+  extractMealPhoto: (fileBase64: string, mediaType: string) =>
+    req<string[]>('/meal-photo/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
   getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
 };
 
+export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Frutta e verdura', 'Latticini'] as const;
+export const MAX_PER_WEEK_OPTIONS = ['1', '2', '3', 'sempre', 'opzionale'] as const;
+export type MaxPerWeek = (typeof MAX_PER_WEEK_OPTIONS)[number];
+
 export interface PlanItem {
   name: string;
   quantity: string;
+  category: string;
+  maxPerWeek: string;
 }

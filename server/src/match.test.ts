@@ -34,6 +34,18 @@ test('verdict: a food from the patient\'s own Nemis plan wins over the generic l
   assert.equal(v.reason, 'plan');
 });
 
+test('verdict: a plan food over its weekly cap is flagged instead of good', () => {
+  const ctx = { planFoods: ['Pizza'], overLimitPlanNames: new Set(['pizza']), month: 7 };
+  const v = verdictOf('Pizza', ctx);
+  assert.equal(v.tone, 'bad');
+  assert.equal(v.reason, 'plan-over-limit');
+});
+
+test('verdict: a plan food under its weekly cap stays good', () => {
+  const ctx = { planFoods: ['Pizza'], overLimitPlanNames: new Set<string>(), month: 7 };
+  assert.deepEqual(verdictOf('Pizza', ctx), { tone: 'good', reason: 'plan' });
+});
+
 test('verdict: seasonal produce is good in season, bad out of season', () => {
   // Le fragole sono in stagione ad aprile-giugno, non a dicembre.
   assert.deepEqual(verdictOf('fragole', { month: 5 }), { tone: 'good', reason: 'season-in' });

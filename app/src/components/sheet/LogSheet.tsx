@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import type { LogMode } from '../../hooks/useDiario';
 import { MicIcon, ModeIcon, CameraIcon } from '../../icons';
-import { toneBg, toneColor, toneGlyph } from '../../lib/tone';
 import { useSpeechRecognition, speechRecognitionSupported } from '../../hooks/useSpeechRecognition';
 import { api, type PlanItem } from '../../api';
 
@@ -13,36 +13,31 @@ const MODES: Array<{ key: LogMode; label: string }> = [
   { key: 'photo', label: 'Foto' },
 ];
 
-const MOCK_PHOTO_ITEMS = ['Petto di pollo', 'Insalata mista', 'Riso integrale', 'Olio evo'];
-
-function verdictOf(name: string, CONSIGLIATI: string[], SCONSIGLIATI: string[]): 'good' | 'ok' | 'bad' {
-  const n = name.toLowerCase();
-  if (SCONSIGLIATI.some((w) => n.includes(w))) return 'bad';
-  if (CONSIGLIATI.some((w) => n.includes(w))) return 'good';
-  return 'ok';
-}
-
 interface Props {
   open: boolean;
   state: AppState;
   activeMeal: MealKey;
   onSelectMeal: (k: MealKey) => void;
+  lockMeal: boolean;
   mode: LogMode;
   onSelectMode: (m: LogMode) => void;
   logText: string;
   onLogTextChange: (v: string) => void;
   hasTranscript: boolean;
   onTranscript: (text: string) => void;
-  photoAdded: boolean;
-  onAddPhoto: () => void;
+  photoFoods: string[] | null;
+  photoExtracting: boolean;
+  photoError: string;
+  onAddPhoto: (file: File) => void;
+  onRetakePhoto: () => void;
   onClose: () => void;
   onSubmit: () => void;
 }
 
 export function LogSheet({
-  open, state, activeMeal, onSelectMeal, mode, onSelectMode,
+  open, state, activeMeal, onSelectMeal, lockMeal, mode, onSelectMode,
   logText, onLogTextChange, hasTranscript, onTranscript,
-  photoAdded, onAddPhoto, onClose, onSubmit,
+  photoFoods, photoExtracting, photoError, onAddPhoto, onRetakePhoto, onClose, onSubmit,
 }: Props) {
   const { recording, error, start, stop } = useSpeechRecognition();
 
@@ -68,7 +63,15 @@ export function LogSheet({
     }
   };
 
-  const canSubmit = mode === 'photo' ? photoAdded : logText.trim().length > 0;
+  const onPhotoFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset subito, altrimenti il browser non rilancia onChange se lo
+    // scatto successivo ha lo stesso nome file del precedente.
+    e.target.value = '';
+    if (file) onAddPhoto(file);
+  };
+
+  const canSubmit = mode === 'photo' ? !!photoFoods?.length : logText.trim().length > 0;
 
   const recLabel = !speechRecognitionSupported
     ? 'Riconoscimento vocale non disponibile su questo browser'
@@ -87,16 +90,24 @@ export function LogSheet({
         <div className="nm-sheet-handle" />
         <div className="nm-sheet-label">Registra</div>
 
-        <div className="nm-chip-row">
-          {MEAL_ORDER.map((k) => {
-            const on = activeMeal === k;
-            return (
-              <button key={k} className={`nm-chip ${on ? 'is-on' : 'is-off'}`} onClick={() => onSelectMeal(k)}>
-                {state.meals[k].label}
-              </button>
-            );
-          })}
-        </div>
+        {lockMeal ? (
+          <div className="nm-sheet-meal-label">{state.meals[activeMeal].label}</div>
+        ) : (
+          <div className="nm-chip-row">
+            {MEAL_ORDER.map((k) => {
+              const on = activeMeal === k;
+              return (
+                <button key={k} className={`nm-chip ${on ? 'is-on' : 'is-off'}`} onClick={() => onSelectMeal(k)}>
+                  {state.meals[k].label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {state.meals[activeMeal].done && (
+          <div className="nm-hint">Già registrato oggi: {state.meals[activeMeal].foods.join(', ')}. Quello che aggiungi ora si somma.</div>
+        )}
 
         <div className="nm-mode-tabs">
           {MODES.map((md) => {
@@ -167,29 +178,38 @@ export function LogSheet({
         )}
 
         {mode === 'photo' && (
-          photoAdded ? (
+          photoExtracting ? (
+            <div className="nm-photo-dropzone">
+              <CameraIcon />
+              <div className="nm-photo-dropzone-title">Riconoscimento in corso…</div>
+            </div>
+          ) : photoFoods ? (
             <div className="nm-photo-preview">
               <div className="nm-photo-thumb">Foto del pasto</div>
               <div className="nm-photo-recognized">
-                <div className="nm-photo-recognized-label">RICONOSCIUTO NELLA FOTO</div>
-                <div className="nm-food-chips">
-                  {MOCK_PHOTO_ITEMS.map((n) => {
-                    const v = verdictOf(n, CONSIGLIATI, SCONSIGLIATI);
-                    return (
-                      <span key={n} className="nm-food-chip" style={{ background: toneBg(v), color: toneColor(v) }}>
-                        {toneGlyph(v)} {n}
-                      </span>
-                    );
-                  })}
+                <div className="nm-photo-recognized-label">
+                  {photoFoods.length ? 'RICONOSCIUTO NELLA FOTO' : 'Nessun alimento riconosciuto'}
                 </div>
+                {photoFoods.length > 0 && (
+                  <div className="nm-food-chips">
+                    {photoFoods.map((n, i) => (
+                      <span key={`${n}-${i}`} className="nm-food-chip nm-food-chip-neutral">{n}</span>
+                    ))}
+                  </div>
+                )}
+                <button type="button" className="nm-onboard-add-btn" onClick={onRetakePhoto}>Rifai la foto</button>
               </div>
             </div>
           ) : (
-            <button className="nm-photo-dropzone" onClick={onAddPhoto}>
-              <CameraIcon />
-              <div className="nm-photo-dropzone-title">Scatta o carica una foto</div>
-              <div className="nm-photo-dropzone-sub">Riconosciamo gli alimenti automaticamente</div>
-            </button>
+            <>
+              <label className="nm-photo-dropzone" style={{ cursor: 'pointer' }}>
+                <input type="file" accept="image/*" capture="environment" onChange={onPhotoFile} style={{ display: 'none' }} />
+                <CameraIcon />
+                <div className="nm-photo-dropzone-title">Scatta o carica una foto</div>
+                <div className="nm-photo-dropzone-sub">Riconosciamo gli alimenti automaticamente</div>
+              </label>
+              {photoError && <div className="nm-plan-error">{photoError}</div>}
+            </>
           )
         )}
 
@@ -198,17 +218,3 @@ export function LogSheet({
     </div>
   );
 }
-
-// Kept in sync with the server's matching lists (server/src/match.ts) purely
-// for the photo-mode mock preview chips, which never leave the client.
-const CONSIGLIATI = [
-  'yogurt', 'avena', 'fiocchi', 'mirtilli', 'frutti di bosco', 'pesce', 'salmone',
-  'verdura', 'insalata', 'spinaci', 'pollo', 'tacchino', 'uova', 'frutta secca',
-  'noci', 'mandorle', 'riso integrale', 'quinoa', 'lenticchie', 'ceci', 'legumi',
-  'olio evo', 'acqua', 'the verde', 'frutta', 'mela', 'banana', 'broccoli', 'zucchine',
-];
-const SCONSIGLIATI = [
-  'zucchero', 'dolce', 'dolci', 'fritto', 'fritti', 'patatine', 'bibita', 'cola',
-  'pizza', 'pane bianco', 'merendina', 'biscotti', 'alcol', 'birra', 'vino',
-  'gelato', 'nutella', 'cornetto', 'brioche', 'salsiccia', 'insaccati',
-];

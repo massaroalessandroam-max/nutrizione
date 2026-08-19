@@ -290,6 +290,7 @@
 }
 .nm-sheet-handle { width: 40px; height: 4px; background: var(--line-strong); border-radius: 9px; margin: 0 auto 16px; }
 .nm-sheet-label { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+.nm-sheet-meal-label { font-size: 19px; font-weight: 700; color: var(--ink); margin: 8px 0 16px; }
 .nm-chip-row { display: flex; gap: 7px; margin: 8px 0 16px; flex-wrap: wrap; }
 .nm-chip {
   border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -353,6 +354,7 @@
 .nm-photo-recognized-label { font-size: 12px; color: var(--ink-faint); font-weight: 600; margin-bottom: 8px; }
 .nm-food-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .nm-food-chip { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 9px; }
+.nm-food-chip-neutral { background: var(--neutral-chip); color: var(--ink); }
 
 .nm-text-input {
   width: 100%; border: 1.5px solid var(--line-medium); border-radius: 14px;
@@ -389,6 +391,15 @@
 .nm-plan-qty-input { max-width: 110px; flex: none; }
 .nm-plan-item-row .nm-onboard-remove-btn { margin-top: 0; }
 .nm-plan-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+.nm-plan-group-title {
+  font-size: 12.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: .3px; margin: 18px 0 9px;
+}
+.nm-plan-item-card { border: 1.5px solid var(--line-medium); border-radius: 14px; padding: 10px; margin-bottom: 9px; background: var(--card); }
+.nm-plan-item-top { display: flex; align-items: center; gap: 8px; }
+.nm-plan-item-bottom { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.nm-plan-item-bottom > * { flex: 1 1 110px; min-width: 0; }
+.nm-plan-item-top .nm-onboard-remove-btn { margin-top: 0; }
 .nm-plan-pdf-btn {
   display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--line-strong); border-radius: 9px;
   background: var(--card); color: var(--teal-700); font-size: 12.5px; font-weight: 600; padding: 6px 11px; cursor: pointer;

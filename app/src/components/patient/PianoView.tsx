@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { api, type PlanItem } from '../../api';
+import { api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, type PlanItem } from '../../api';
 import { CameraIcon, PdfIcon, PlusIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
-import { SHOPPING_DAY_OPTIONS, buildShoppingList, type ShoppingDays } from '../../lib/shoppingList';
+import { fileToBase64 } from '../../lib/file';
 
-const DAY_LABEL: Record<ShoppingDays, string> = { 2: '2 giorni', 3: '3 giorni', 7: '1 settimana' };
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = () => reject(reader.error ?? new Error('lettura file fallita'));
-    reader.readAsDataURL(file);
-  });
-}
+const MAX_PER_WEEK_LABEL: Record<string, string> = {
+  '1': '1 volta/sett.', '2': '2 volte/sett.', '3': '3 volte/sett.', sempre: 'Sempre', opzionale: 'Opzionale',
+};
+const OTHER_CATEGORY = 'Altro';
+const GROUPS = [...PLAN_CATEGORIES, OTHER_CATEGORY];
 
 interface Props {
   patientName: string;
@@ -27,7 +22,6 @@ export function PianoView({ patientName }: Props) {
   const [extractError, setExtractError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [shoppingDays, setShoppingDays] = useState<ShoppingDays>(7);
 
   useEffect(() => {
     api.getPlan().then(setItems).catch(() => setItems([]));
@@ -35,6 +29,11 @@ export function PianoView({ patientName }: Props) {
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset subito, altrimenti il browser non rilancia onChange se il
+    // prossimo scatto/selezione ha lo stesso nome file del precedente
+    // (comune con le foto della fotocamera) — la foto successiva verrebbe
+    // ignorata silenziosamente.
+    e.target.value = '';
     if (!file) return;
     setFileName(file.name);
     setSaved(false);
@@ -53,12 +52,11 @@ export function PianoView({ patientName }: Props) {
     }
   };
 
-  const setName = (i: number, name: string) =>
-    setItems((it) => it?.map((x, idx) => (idx === i ? { ...x, name } : x)) ?? it);
-  const setQty = (i: number, quantity: string) =>
-    setItems((it) => it?.map((x, idx) => (idx === i ? { ...x, quantity } : x)) ?? it);
+  const updateItem = (i: number, patch: Partial<PlanItem>) =>
+    setItems((it) => it?.map((x, idx) => (idx === i ? { ...x, ...patch } : x)) ?? it);
   const removeItem = (i: number) => setItems((it) => it?.filter((_, idx) => idx !== i) ?? it);
-  const addItem = () => setItems((it) => [...(it ?? []), { name: '', quantity: '' }]);
+  const addItem = (category: string) =>
+    setItems((it) => [...(it ?? []), { name: '', quantity: '', category: category === OTHER_CATEGORY ? '' : category, maxPerWeek: 'sempre' }]);
 
   const save = async () => {
     if (!items) return;
@@ -75,19 +73,29 @@ export function PianoView({ patientName }: Props) {
     generatePlanPdf(items, patientName);
   };
 
-  const shoppingList = useMemo(() => buildShoppingList(items ?? [], shoppingDays), [items, shoppingDays]);
+  // Raggruppa per macro-categoria (ordine fisso), con "Altro" per le voci
+  // senza categoria riconosciuta.
+  const groups = useMemo(() => {
+    const byCategory = new Map<string, { item: PlanItem; index: number }[]>();
+    (items ?? []).forEach((item, index) => {
+      const key = (PLAN_CATEGORIES as readonly string[]).includes(item.category) ? item.category : OTHER_CATEGORY;
+      if (!byCategory.has(key)) byCategory.set(key, []);
+      byCategory.get(key)!.push({ item, index });
+    });
+    return GROUPS.map((name) => ({ name, entries: byCategory.get(name) ?? [] }));
+  }, [items]);
 
   return (
     <div className="nm-section">
       <div className="nm-page-title">Piano del nutrizionista</div>
-      <div className="nm-page-sub">Carica una foto o un PDF delle indicazioni: estraiamo alimenti e grammature.</div>
+      <div className="nm-page-sub">Carica una foto o un PDF delle indicazioni: estraiamo alimenti, grammature e frequenza.</div>
 
       <label className="nm-photo-dropzone" style={{ cursor: 'pointer' }}>
         <input type="file" accept="image/*,.pdf" onChange={onFile} style={{ display: 'none' }} />
         <CameraIcon />
         <div className="nm-photo-dropzone-title">{fileName || 'Carica foto o PDF del piano'}</div>
         <div className="nm-photo-dropzone-sub">
-          {extracting ? 'Estrazione in corso…' : 'Riconosciamo alimenti e quantità automaticamente'}
+          {extracting ? 'Estrazione in corso…' : 'Riconosciamo alimenti, quantità e categoria automaticamente'}
         </div>
       </label>
 
@@ -98,7 +106,7 @@ export function PianoView({ patientName }: Props) {
       ) : (
         <>
           <div className="nm-plan-section-head">
-            <div className="nm-section-label" style={{ marginTop: 20, marginBottom: 0 }}>Alimenti e grammature</div>
+            <div className="nm-section-label" style={{ marginTop: 20, marginBottom: 0 }}>Alimenti</div>
             {items.length > 0 && (
               <button className="nm-plan-pdf-btn" onClick={downloadPdf} aria-label="Scarica piano in PDF">
                 <PdfIcon size={15} /> PDF
@@ -107,57 +115,58 @@ export function PianoView({ patientName }: Props) {
           </div>
           {items.length === 0 && <div className="nm-hint">Nessun alimento ancora. Carica un file o aggiungi a mano.</div>}
 
-          {items.map((it, i) => (
-            <div key={i} className="nm-plan-item-row">
-              <input
-                className="nm-text-input"
-                value={it.name}
-                onChange={(e) => setName(i, e.target.value)}
-                placeholder="Alimento"
-              />
-              <input
-                className="nm-text-input nm-plan-qty-input"
-                value={it.quantity}
-                onChange={(e) => setQty(i, e.target.value)}
-                placeholder="Quantità"
-              />
-              <button className="nm-onboard-remove-btn" onClick={() => removeItem(i)} aria-label="Rimuovi alimento">×</button>
+          {groups.map((group) => (
+            <div key={group.name}>
+              {(group.entries.length > 0 || group.name !== OTHER_CATEGORY) && (
+                <div className="nm-plan-group-title">{group.name}</div>
+              )}
+              {group.entries.map(({ item, index }) => (
+                <div key={index} className="nm-plan-item-card">
+                  <div className="nm-plan-item-top">
+                    <input
+                      className="nm-text-input"
+                      value={item.name}
+                      onChange={(e) => updateItem(index, { name: e.target.value })}
+                      placeholder="Alimento"
+                    />
+                    <button className="nm-onboard-remove-btn" onClick={() => removeItem(index)} aria-label="Rimuovi alimento">×</button>
+                  </div>
+                  <div className="nm-plan-item-bottom">
+                    <input
+                      className="nm-text-input"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, { quantity: e.target.value })}
+                      placeholder="Grammatura"
+                    />
+                    <select
+                      className="nm-text-input"
+                      value={item.category}
+                      onChange={(e) => updateItem(index, { category: e.target.value })}
+                    >
+                      <option value="">{OTHER_CATEGORY}</option>
+                      {PLAN_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select
+                      className="nm-text-input"
+                      value={item.maxPerWeek}
+                      onChange={(e) => updateItem(index, { maxPerWeek: e.target.value })}
+                    >
+                      {MAX_PER_WEEK_OPTIONS.map((o) => <option key={o} value={o}>{MAX_PER_WEEK_LABEL[o]}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ))}
+              {group.name !== OTHER_CATEGORY && (
+                <button className="nm-onboard-add-btn" onClick={() => addItem(group.name)}>
+                  <PlusIcon size={14} /> Aggiungi a {group.name.toLowerCase()}
+                </button>
+              )}
             </div>
           ))}
-
-          <button className="nm-onboard-add-btn" onClick={addItem}>
-            <PlusIcon size={14} /> Aggiungi alimento
-          </button>
 
           <button className="nm-submit-btn" disabled={saving} onClick={save}>
             {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
           </button>
-
-          {items.length > 0 && (
-            <>
-              <div className="nm-section-label" style={{ marginTop: 26 }}>Lista della spesa</div>
-              <div className="nm-chip-row">
-                {SHOPPING_DAY_OPTIONS.map((d) => (
-                  <button
-                    key={d}
-                    className={`nm-chip ${shoppingDays === d ? 'is-on' : 'is-off'}`}
-                    onClick={() => setShoppingDays(d)}
-                  >
-                    {DAY_LABEL[d]}
-                  </button>
-                ))}
-              </div>
-              <div className="nm-plan-item-list">
-                {shoppingList.map((entry, i) => (
-                  <div key={i} className="nm-shopping-row">
-                    <span>{entry.name}</span>
-                    <span className="nm-shopping-qty">{entry.quantity}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="nm-hint">Quantità stimate assumendo il consumo indicato ogni giorno del periodo scelto.</div>
-            </>
-          )}
         </>
       )}
     </div>

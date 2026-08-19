@@ -19,6 +19,7 @@ export function toneGlyph(tone: Tone): string {
 export function verdictLabel(f: FoodVerdict): string {
   switch (f.reason) {
     case 'plan': return 'Consigliato dal piano';
+    case 'plan-over-limit': return 'Troppe volte questa settimana';
     case 'season-in': return 'Frutta/verdura di stagione';
     case 'season-out': return 'Fuori stagione';
     case 'list': return f.verdict === 'good' ? 'Scelta consigliata' : 'Da limitare';

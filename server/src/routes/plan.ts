@@ -1,23 +1,40 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { ANTHROPIC_API_KEY, MAX_BASE64_LEN, callClaudeWithFile, extractJsonArray } from '../anthropic.js';
 
 export const planRouter = Router();
+
+// Macro-categorie fisse per raggruppare gli alimenti del piano, e opzioni
+// per il tetto settimanale concordato col nutrizionista.
+export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Frutta e verdura', 'Latticini'] as const;
+export const MAX_PER_WEEK_OPTIONS = ['1', '2', '3', 'sempre', 'opzionale'] as const;
 
 interface PlanItemBody {
   name?: unknown;
   quantity?: unknown;
+  category?: unknown;
+  maxPerWeek?: unknown;
 }
 
-function cleanItems(input: unknown): Array<{ name: string; quantity: string }> {
+function cleanItems(input: unknown): Array<{ name: string; quantity: string; category: string; maxPerWeek: string }> {
   if (!Array.isArray(input)) return [];
   return (input as PlanItemBody[])
-    .map((it) => ({ name: String(it?.name ?? '').trim(), quantity: String(it?.quantity ?? '').trim() }))
+    .map((it) => {
+      const category = String(it?.category ?? '').trim();
+      const maxPerWeek = String(it?.maxPerWeek ?? '').trim();
+      return {
+        name: String(it?.name ?? '').trim(),
+        quantity: String(it?.quantity ?? '').trim(),
+        category: (PLAN_CATEGORIES as readonly string[]).includes(category) ? category : '',
+        maxPerWeek: (MAX_PER_WEEK_OPTIONS as readonly string[]).includes(maxPerWeek) ? maxPerWeek : 'sempre',
+      };
+    })
     .filter((it) => it.name);
 }
 
 planRouter.get('/plan', async (_req, res) => {
-  const { rows } = await db.execute('SELECT name, quantity FROM nutrition_plan_items ORDER BY idx');
-  res.json((rows as any[]).map((r) => ({ name: r.name, quantity: r.quantity })));
+  const { rows } = await db.execute('SELECT name, quantity, category, max_per_week FROM nutrition_plan_items ORDER BY idx');
+  res.json((rows as any[]).map((r) => ({ name: r.name, quantity: r.quantity, category: r.category, maxPerWeek: r.max_per_week })));
 });
 
 planRouter.post('/plan', async (req, res) => {
@@ -26,8 +43,8 @@ planRouter.post('/plan', async (req, res) => {
   await db.execute('DELETE FROM nutrition_plan_items');
   for (const [idx, it] of items.entries()) {
     await db.execute({
-      sql: 'INSERT INTO nutrition_plan_items (idx, name, quantity) VALUES (?, ?, ?)',
-      args: [idx, it.name, it.quantity],
+      sql: 'INSERT INTO nutrition_plan_items (idx, name, quantity, category, max_per_week) VALUES (?, ?, ?, ?, ?)',
+      args: [idx, it.name, it.quantity, it.category, it.maxPerWeek],
     });
   }
 
@@ -35,26 +52,18 @@ planRouter.post('/plan', async (req, res) => {
 });
 
 // Estrazione alimenti+grammature da una foto o un PDF del piano, via Claude
-// (vision/documenti). Chiamata via fetch nativo invece dell'SDK: una
-// richiesta HTTP semplice non giustifica una dipendenza in più. Il file non
-// viene salvato lato server: si estrae e via, come dichiarato nell'UI.
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
-const MAX_BASE64_LEN = 14_000_000; // ~10MB decodificati
-
-const EXTRACT_PROMPT = `Sei un assistente che estrae informazioni da un piano alimentare/nutrizionale (dieta) caricato come foto o PDF.
-Analizza il documento ed estrai l'elenco degli alimenti indicati con le relative quantità/grammature.
+// (vision/documenti). Il file non viene salvato lato server: si estrae e
+// via, come dichiarato nell'UI.
+const EXTRACT_PROMPT = `Sei un assistente che estrae informazioni da un piano alimentare/nutrizionale (dieta) caricato come foto o PDF, che può avere più pagine.
+Analizza TUTTE le pagine del documento ed estrai l'elenco completo degli alimenti indicati, uno per voce (non riassumere né tralasciare voci di elenchi lunghi).
 Rispondi ESCLUSIVAMENTE con un array JSON valido, senza testo aggiuntivo prima o dopo, in questo formato esatto:
-[{"name": "nome alimento", "quantity": "quantità, es. 150 g"}]
-Se un alimento non ha una quantità specificata nel documento, usa una stringa vuota "" per quantity.
-Se il documento non è un piano alimentare o non contiene alimenti riconoscibili, rispondi con: []`;
+[{"name": "nome alimento", "quantity": "quantità, es. 150 g", "category": "categoria", "maxPerWeek": "frequenza"}]
 
-function extractJsonArray(text: string): unknown {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) throw new Error('nessun array JSON nella risposta');
-  return JSON.parse(text.slice(start, end + 1));
-}
+- "quantity": la grammatura/quantità indicata nel documento per quell'alimento. Molti alimenti (es. verdure a quantità libera) non hanno una grammatura: in quel caso usa una stringa vuota "" e riporta comunque solo il nome dell'alimento, senza inventare un valore.
+- "category": una di queste quattro, quella più adatta: "Carboidrati", "Proteine", "Frutta e verdura", "Latticini". Se l'alimento non rientra chiaramente in nessuna, usa una stringa vuota "".
+- "maxPerWeek": quante volte massimo a settimana il documento indica per quell'alimento, una di queste stringhe esatte: "1", "2", "3", "sempre" (consentito tutti i giorni/senza limite indicato), "opzionale" (facoltativo/a piacere). Se il documento non specifica una frequenza, usa "sempre".
+
+Se il documento non è un piano alimentare o non contiene alimenti riconoscibili, rispondi con: []`;
 
 planRouter.post('/plan/extract', async (req, res) => {
   if (!ANTHROPIC_API_KEY) {
@@ -69,39 +78,16 @@ planRouter.post('/plan/extract', async (req, res) => {
     return res.status(413).json({ error: 'File troppo grande (limite ~10MB)' });
   }
 
-  const isPdf = mediaType === 'application/pdf';
-  const contentBlock = isPdf
-    ? { type: 'document', source: { type: 'base64', media_type: mediaType, data: fileBase64 } }
-    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: fileBase64 } };
-
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: EXTRACT_PROMPT }] }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errBody = await resp.text().catch(() => '');
-      console.error('[plan/extract] errore Anthropic API:', resp.status, errBody);
-      return res.status(502).json({ error: 'Estrazione fallita (servizio AI non disponibile). Inserisci gli alimenti a mano.' });
-    }
-
-    const data = (await resp.json()) as { content?: Array<{ text?: string }> };
-    const text = data.content?.[0]?.text ?? '';
+    const text = await callClaudeWithFile(fileBase64, mediaType, EXTRACT_PROMPT, 8192);
     const parsed = extractJsonArray(text);
     if (!Array.isArray(parsed)) throw new Error('la risposta non è un array');
 
     res.json(cleanItems(parsed));
   } catch (e) {
+    if ((e as any).code === 'api_unavailable') {
+      return res.status(502).json({ error: 'Estrazione fallita (servizio AI non disponibile). Inserisci gli alimenti a mano.' });
+    }
     console.error('[plan/extract] errore:', (e as Error).message);
     res.status(502).json({ error: 'Non sono riuscito a leggere il documento. Riprova o inserisci gli alimenti a mano.' });
   }

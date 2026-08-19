@@ -7,6 +7,7 @@ import { stateRouter } from './routes/state.js';
 import { patientsRouter } from './routes/patients.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { planRouter } from './routes/plan.js';
+import { mealPhotoRouter } from './routes/mealPhoto.js';
 import { initDb, isRemoteDb } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ app.use('/api', stateRouter);
 app.use('/api', patientsRouter);
 app.use('/api', onboardingRouter);
 app.use('/api', planRouter);
+app.use('/api', mealPhotoRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb() }));
 

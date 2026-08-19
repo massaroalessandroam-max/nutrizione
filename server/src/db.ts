@@ -116,14 +116,30 @@ export async function initDb(): Promise<void> {
     );
   `);
   // Alimenti e grammature estratti dal piano del nutrizionista (foto/PDF
-  // caricati dal paziente).
+  // caricati dal paziente). category raggruppa per macro-tipo (carboidrati/
+  // proteine/frutta e verdura/latticini); max_per_week è il tetto settimanale
+  // concordato col nutrizionista ('1'/'2'/'3'/'sempre'/'opzionale') — usato
+  // per segnalare quando un alimento (es. pizza) viene registrato più volte
+  // di quanto previsto.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS nutrition_plan_items (
       idx INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
-      quantity TEXT NOT NULL
+      quantity TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
+      max_per_week TEXT NOT NULL DEFAULT 'sempre'
     );
   `);
+  for (const migration of [
+    "ALTER TABLE nutrition_plan_items ADD COLUMN category TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE nutrition_plan_items ADD COLUMN max_per_week TEXT NOT NULL DEFAULT 'sempre'",
+  ]) {
+    try {
+      await db.execute(migration);
+    } catch {
+      // colonna già presente
+    }
+  }
 
   await ensureAppStateRow();
 }

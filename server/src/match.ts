@@ -10,7 +10,7 @@
 import { isInSeason } from './seasonal.js';
 
 export type Tone = 'good' | 'ok' | 'bad';
-export type VerdictReason = 'plan' | 'season-in' | 'season-out' | 'list' | 'none';
+export type VerdictReason = 'plan' | 'plan-over-limit' | 'season-in' | 'season-out' | 'list' | 'none';
 
 export interface Verdict {
   tone: Tone;
@@ -19,6 +19,10 @@ export interface Verdict {
 
 export interface MatchContext {
   planFoods?: string[];
+  // Nomi (lowercase) degli alimenti del piano il cui tetto settimanale
+  // ("massimo X volte a settimana") è già stato raggiunto o superato questa
+  // settimana — calcolato dal chiamante su meals/nutrition_plan_items.
+  overLimitPlanNames?: Set<string>;
   // Mese 1-12: parametrizzabile (test, o un futuro fuso orario del
   // paziente) invece di leggere sempre l'orologio di sistema.
   month?: number;
@@ -37,7 +41,7 @@ export const SCONSIGLIATI = [
   'gelato', 'nutella', 'cornetto', 'brioche', 'salsiccia', 'insaccati',
 ];
 
-function foodMatches(loggedName: string, planItemName: string): boolean {
+export function foodMatches(loggedName: string, planItemName: string): boolean {
   const a = loggedName.trim();
   const b = planItemName.toLowerCase().trim();
   return !!a && !!b && (a.includes(b) || b.includes(a));
@@ -47,7 +51,11 @@ export function verdictOf(name: string, ctx: MatchContext = {}): Verdict {
   const n = name.toLowerCase().trim();
   const month = ctx.month ?? new Date().getMonth() + 1;
 
-  if (ctx.planFoods?.some((p) => foodMatches(n, p))) return { tone: 'good', reason: 'plan' };
+  const matchedPlan = ctx.planFoods?.find((p) => foodMatches(n, p));
+  if (matchedPlan) {
+    if (ctx.overLimitPlanNames?.has(matchedPlan.toLowerCase())) return { tone: 'bad', reason: 'plan-over-limit' };
+    return { tone: 'good', reason: 'plan' };
+  }
 
   const seasonal = isInSeason(n, month);
   if (seasonal === true) return { tone: 'good', reason: 'season-in' };
@@ -86,6 +94,7 @@ export function score(foods: string[], ctx: MatchContext = {}): Score {
 export function verdictLabel(v: Verdict): string {
   switch (v.reason) {
     case 'plan': return 'Consigliato dal piano';
+    case 'plan-over-limit': return 'Troppe volte questa settimana';
     case 'season-in': return 'Frutta/verdura di stagione';
     case 'season-out': return 'Fuori stagione';
     case 'list': return v.tone === 'good' ? 'Scelta consigliata' : 'Da limitare';

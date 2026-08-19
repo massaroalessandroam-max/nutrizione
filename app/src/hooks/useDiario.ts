@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { fileToBase64 } from '../lib/file';
 import type { AppState, FastingPref, LogSummary, MealKey, Schedule, PatientDetail, PatientListItem } from '../types';
 import { MEAL_ORDER } from '../types';
 
 export type Role = 'paziente' | 'nutrizionista';
 export type Tab = 'diario' | 'premi' | 'digiuno' | 'piano' | 'report';
 export type LogMode = 'text' | 'audio' | 'photo';
-
-const MOCK_PHOTO_FOODS = ['Petto di pollo', 'Insalata mista', 'Riso integrale', 'Olio evo'];
 
 export function useDiario() {
   const [role, setRole] = useState<Role>('paziente');
@@ -19,10 +18,13 @@ export function useDiario() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [activeMeal, setActiveMeal] = useState<MealKey>('pranzo');
+  const [mealLocked, setMealLocked] = useState(true);
   const [mode, setMode] = useState<LogMode>('text');
   const [logText, setLogText] = useState('');
   const [hasTranscript, setHasTranscript] = useState(false);
-  const [photoAdded, setPhotoAdded] = useState(false);
+  const [photoFoods, setPhotoFoods] = useState<string[] | null>(null);
+  const [photoExtracting, setPhotoExtracting] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [lastSummary, setLastSummary] = useState<LogSummary | null>(null);
 
   const [toast, setToast] = useState('');
@@ -61,25 +63,31 @@ export function useDiario() {
     api.getPatient(activePatientId).then(setActivePatient).catch(() => setActivePatient(null));
   }, [activePatientId]);
 
-  const openSheet = useCallback((key: MealKey) => {
-    const done = appState?.meals[key];
+  // key: locked di default (tap su un pasto specifico dal Diario) -> nel
+  // sheet non si può cambiare pasto. Il testo/foto parte sempre vuoto: ogni
+  // registrazione si AGGIUNGE a quelle già fatte per quel pasto oggi (es.
+  // yogurt alle 6, poi uova e pane alle 8), non le sostituisce.
+  const openSheet = useCallback((key: MealKey, locked = true) => {
     setActiveMeal(key);
     setMode('text');
-    setLogText(done?.done ? done.foods.join(', ') : '');
-    setHasTranscript(!!done?.done);
-    setPhotoAdded(false);
+    setLogText('');
+    setHasTranscript(false);
+    setPhotoFoods(null);
+    setPhotoError('');
+    setMealLocked(locked);
     setSheetOpen(true);
-  }, [appState]);
+  }, []);
 
   const openLogQuick = useCallback(() => {
     // Preferisce il prossimo pasto tra quelli abituali del paziente; se
     // sono già tutti fatti, propone comunque un pasto extra fuori routine.
+    // Aperto da qui il pasto resta cambiabile (locked=false).
     const active = appState?.activeMeals ?? [];
     const nextMeal =
       active.find((k) => !appState?.meals[k]?.done) ??
       MEAL_ORDER.find((k) => !appState?.meals[k]?.done) ??
       'spuntino';
-    openSheet(nextMeal);
+    openSheet(nextMeal, false);
   }, [appState, openSheet]);
 
   const closeSheet = useCallback(() => setSheetOpen(false), []);
@@ -89,15 +97,28 @@ export function useDiario() {
     setHasTranscript(true);
   }, []);
 
-  const addPhoto = useCallback(() => setPhotoAdded(true), []);
+  const addPhoto = useCallback(async (file: File) => {
+    setPhotoError('');
+    setPhotoExtracting(true);
+    try {
+      const fileBase64 = await fileToBase64(file);
+      const foods = await api.extractMealPhoto(fileBase64, file.type || 'application/octet-stream');
+      setPhotoFoods(foods);
+    } catch (err) {
+      setPhotoError((err as Error).message || 'Riconoscimento fallito. Inserisci gli alimenti a mano.');
+    } finally {
+      setPhotoExtracting(false);
+    }
+  }, []);
+
+  const retakePhoto = useCallback(() => {
+    setPhotoFoods(null);
+    setPhotoError('');
+  }, []);
 
   const submitLog = useCallback(async () => {
-    let foods: string[];
-    if (mode === 'photo' && photoAdded) {
-      foods = MOCK_PHOTO_FOODS;
-    } else {
-      foods = logText.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
-    }
+    const foods =
+      mode === 'photo' ? photoFoods ?? [] : logText.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
     if (!foods.length) return;
 
     const { state, summary } = await api.logMeal(activeMeal, foods);
@@ -105,7 +126,7 @@ export function useDiario() {
     setLastSummary(summary);
     setSheetOpen(false);
     setSummaryOpen(true);
-  }, [mode, photoAdded, logText, activeMeal]);
+  }, [mode, photoFoods, logText, activeMeal]);
 
   const closeSummary = useCallback(() => setSummaryOpen(false), []);
 
@@ -159,11 +180,11 @@ export function useDiario() {
     appState, loading, refreshState,
     sheetOpen, openSheet, openLogQuick, closeSheet,
     summaryOpen, closeSummary, sendFromSummary, lastSummary,
-    activeMeal, setActiveMeal,
+    activeMeal, setActiveMeal, mealLocked,
     mode, setMode,
     logText, setLogText,
     hasTranscript, applyTranscript,
-    photoAdded, addPhoto,
+    photoFoods, photoExtracting, photoError, addPhoto, retakePhoto,
     submitLog,
     toast, showToast,
     completeOnboarding,

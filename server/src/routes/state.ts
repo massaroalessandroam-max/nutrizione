@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { ORDER, LABEL, isMealKey, type MealKey } from '../constants.js';
-import { score, verdict, verdictOf, pointsForFoods, type MatchContext } from '../match.js';
+import { score, verdict, verdictOf, pointsForFoods, foodMatches, type MatchContext } from '../match.js';
 import { computeStreak, computeWeek, computeBadges } from '../stats.js';
 
 export const stateRouter = Router();
@@ -37,12 +37,37 @@ export async function loadSchedule() {
   return { ...meals, snacks };
 }
 
+// Alimenti registrati (pasti fatti) negli ultimi 7 giorni fino a `date`
+// compreso — usato per verificare se un alimento del piano ha già raggiunto
+// il suo tetto settimanale.
+async function loadWeekFoods(date: string): Promise<string[]> {
+  const { rows } = await db.execute({
+    sql: `SELECT foods FROM meals WHERE done = 1 AND date >= date(?, '-6 days') AND date <= ?`,
+    args: [date, date],
+  });
+  return (rows as any[]).flatMap((r) => JSON.parse(r.foods) as string[]);
+}
+
 // Alimenti del piano Nemis del paziente (caricato in PianoView): hanno
 // priorità sulle liste generiche CONSIGLIATI/SCONSIGLIATI nel match engine.
-async function loadMatchContext(): Promise<MatchContext> {
-  const { rows } = await db.execute('SELECT name FROM nutrition_plan_items');
-  const planFoods = (rows as any[]).map((r) => r.name as string);
-  return { planFoods, month: new Date().getMonth() + 1 };
+// Chi ha un tetto settimanale numerico ('1'/'2'/'3') e lo ha già raggiunto o
+// superato questa settimana finisce in overLimitPlanNames, così il match
+// engine lo segnala invece di darlo per "buono" a prescindere.
+async function loadMatchContext(date: string): Promise<MatchContext> {
+  const { rows } = await db.execute('SELECT name, max_per_week FROM nutrition_plan_items');
+  const planItems = (rows as any[]).map((r) => ({ name: r.name as string, maxPerWeek: r.max_per_week as string }));
+  const planFoods = planItems.map((p) => p.name);
+
+  const weekFoods = await loadWeekFoods(date);
+  const overLimitPlanNames = new Set<string>();
+  for (const item of planItems) {
+    const cap = Number(item.maxPerWeek);
+    if (!Number.isFinite(cap) || cap <= 0) continue; // 'sempre'/'opzionale': nessun tetto
+    const count = weekFoods.filter((f) => foodMatches(f.toLowerCase().trim(), item.name)).length;
+    if (count > cap) overLimitPlanNames.add(item.name.toLowerCase());
+  }
+
+  return { planFoods, overLimitPlanNames, month: new Date().getMonth() + 1 };
 }
 
 // I pasti "attivi" sono quelli che il paziente fa di solito (impostati in
@@ -88,7 +113,7 @@ export async function buildState() {
   const { rows } = await db.execute('SELECT * FROM app_state WHERE id = 1');
   const appState = rows[0] as any;
   const meals = await loadMeals(date);
-  const ctx = await loadMatchContext();
+  const ctx = await loadMatchContext(date);
   const schedule = await loadSchedule();
   const activeMeals = computeActiveMeals(schedule);
   // Denominatore di oggi: pasti della routine non saltati OGGI, più
@@ -170,13 +195,24 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
 
   const date = todayStr();
   const time = new Date().toTimeString().slice(0, 5);
+
+  // Un pasto può accumulare più registrazioni nello stesso giorno (es.
+  // yogurt alle 6, colazione completa con uova e pane alle 8): i nuovi
+  // alimenti si aggiungono a quelli già registrati invece di sostituirli.
+  const { rows: existingRows } = await db.execute({
+    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
+    args: [date, key],
+  });
+  const existingFoods: string[] = existingRows[0] ? JSON.parse((existingRows[0] as any).foods) : [];
+  const mergedFoods = [...existingFoods, ...foods];
+
   await db.execute({
     sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 1, ?, ?, 0)
           ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time, skipped = 0`,
-    args: [date, key, JSON.stringify(foods), time],
+    args: [date, key, JSON.stringify(mergedFoods), time],
   });
 
-  const ctx = await loadMatchContext();
+  const ctx = await loadMatchContext(date);
   const pts = pointsForFoods(foods, ctx);
   await db.execute({ sql: 'UPDATE app_state SET points = points + ? WHERE id = 1', args: [pts] });
 
@@ -207,7 +243,7 @@ stateRouter.delete('/meals/:key/log', async (req, res) => {
   const row = rows[0] as any;
   if (row) {
     const foods: string[] = JSON.parse(row.foods);
-    const pts = pointsForFoods(foods, await loadMatchContext());
+    const pts = pointsForFoods(foods, await loadMatchContext(date));
     await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ?) WHERE id = 1', args: [pts] });
   }
 

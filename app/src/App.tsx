@@ -76,14 +76,18 @@ function App() {
             state={d.appState}
             activeMeal={d.activeMeal}
             onSelectMeal={d.setActiveMeal}
+            lockMeal={d.mealLocked}
             mode={d.mode}
             onSelectMode={d.setMode}
             logText={d.logText}
             onLogTextChange={d.setLogText}
             hasTranscript={d.hasTranscript}
             onTranscript={d.applyTranscript}
-            photoAdded={d.photoAdded}
+            photoFoods={d.photoFoods}
+            photoExtracting={d.photoExtracting}
+            photoError={d.photoError}
             onAddPhoto={d.addPhoto}
+            onRetakePhoto={d.retakePhoto}
             onClose={d.closeSheet}
             onSubmit={d.submitLog}
           />
