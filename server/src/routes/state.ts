@@ -91,11 +91,13 @@ export async function buildState() {
   const ctx = await loadMatchContext();
   const schedule = await loadSchedule();
   const activeMeals = computeActiveMeals(schedule);
-  // Denominatore di oggi: pasti abituali meno quelli saltati apposta oggi
-  // (es. digiuno prolungato che salta colazione+pranzo per un giorno) —
-  // diverso da activeMeals, che resta la routine e serve solo a decidere
-  // quali pasti mostrare in lista.
-  const activeMealCount = activeMeals.filter((k) => !meals[k].skipped).length;
+  // Denominatore di oggi: pasti della routine non saltati OGGI, più
+  // qualsiasi pasto extra registrato fuori routine (es. uno spuntino non
+  // pianificato) — quel pasto è "presente" quindi conta. activeMeals resta
+  // la routine pura e serve solo a decidere quali pasti mostrare in lista.
+  const activeMealCount = ORDER.filter(
+    (k) => (activeMeals.includes(k) && !meals[k].skipped) || meals[k].done
+  ).length;
 
   const doneCount = ORDER.filter((k) => meals[k].done).length;
   const allFoods = ORDER.flatMap((k) => meals[k].foods);
