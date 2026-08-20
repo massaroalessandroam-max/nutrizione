@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, planUploadDownloadUrl, type PlanItem, type PlanUpload } from '../../api';
+import {
+  api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, planUploadDownloadUrl,
+  type PlanItem, type PlanUpload, type ChefCombo,
+} from '../../api';
 import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
 import { fileToBase64 } from '../../lib/file';
@@ -14,36 +17,31 @@ const MAX_PER_WEEK_SELECT_OPTIONS = ['', ...MAX_PER_WEEK_OPTIONS];
 const OTHER_CATEGORY = 'Altro';
 const GROUPS = [...PLAN_CATEGORIES, OTHER_CATEGORY];
 
-// Composizione di un pasto "completo" per lo Chef: per ciascun pasto, le
-// macro-categorie che deve avere. Proteine e Legumi condividono lo slot
-// proteico (nel piano italiano sono fonti alternative), Grassi fa da
-// condimento. Regola fissa e ragionevole, non configurabile: se in futuro
-// serve personalizzarla per paziente, va spostata lato server nel piano.
-interface ChefSlot { label: string; categories: string[] }
-const CHEF_SLOTS: Record<MealKey, ChefSlot[]> = {
-  colazione: [
-    { label: 'Carboidrati', categories: ['Carboidrati'] },
-    { label: 'Latticini', categories: ['Latticini'] },
-    { label: 'Frutta', categories: ['Frutta'] },
-  ],
-  pranzo: [
-    { label: 'Carboidrati', categories: ['Carboidrati'] },
-    { label: 'Proteine', categories: ['Proteine', 'Legumi'] },
-    { label: 'Verdura', categories: ['Verdura'] },
-    { label: 'Condimento', categories: ['Grassi'] },
-  ],
-  cena: [
-    { label: 'Proteine', categories: ['Proteine', 'Legumi'] },
-    { label: 'Verdura', categories: ['Verdura'] },
-    { label: 'Condimento', categories: ['Grassi'] },
-  ],
-  spuntino: [
-    { label: 'Spuntino', categories: ['Frutta', 'Latticini', 'Grassi'] },
-  ],
+// Composizione di partenza (solo per il primo menu casuale, prima che il
+// paziente salvi una combo propria): una categoria per slot. Il paziente
+// può poi aggiungere/togliere slot liberamente — questa è solo un punto di
+// partenza ragionevole, non una regola fissa.
+const CHEF_STARTER_CATEGORIES: Record<MealKey, string[]> = {
+  colazione: ['Carboidrati', 'Latticini', 'Frutta'],
+  pranzo: ['Carboidrati', 'Proteine', 'Verdura', 'Grassi'],
+  cena: ['Proteine', 'Verdura', 'Grassi'],
+  spuntino: ['Frutta'],
 };
 
+const CHEF_DAYS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'] as const;
+const CHEF_DAY_LABEL: Record<string, string> = { lun: 'L', mar: 'M', mer: 'M', gio: 'G', ven: 'V', sab: 'S', dom: 'D' };
+const JS_DAY_TO_CODE = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+function chefTodayCode(): string {
+  return JS_DAY_TO_CODE[new Date().getDay()];
+}
+
+interface ChefDraftSlot { category: string; item: PlanItem | null }
+
+// Confronto per nome (non per riferimento): un item caricato da una combo
+// salvata è un oggetto nuovo ogni volta, non lo stesso riferimento del
+// pool — confrontare per riferimento non lo escluderebbe mai dallo swap.
 function pickRandom(pool: PlanItem[], exclude?: PlanItem | null): PlanItem | null {
-  const options = exclude ? pool.filter((x) => x !== exclude) : pool;
+  const options = exclude ? pool.filter((x) => x.name !== exclude.name) : pool;
   const from = options.length ? options : pool;
   return from.length ? from[Math.floor(Math.random() * from.length)] : null;
 }
@@ -75,34 +73,104 @@ export function PianoView({ patientName }: Props) {
   // "Alimenti" è chiuso finché il paziente non tocca il titolo per
   // esplorare le macro-categorie del piano.
   const [alimentiOpen, setAlimentiOpen] = useState(false);
-  const [chefMenu, setChefMenu] = useState<Record<MealKey, (PlanItem | null)[]> | null>(null);
+
+  const [combos, setCombos] = useState<ChefCombo[] | null>(null);
+  const [draft, setDraft] = useState<Partial<Record<MealKey, ChefDraftSlot[]>>>({});
+  const [editingComboId, setEditingComboId] = useState<Partial<Record<MealKey, number>>>({});
+  const [daysDraft, setDaysDraft] = useState<Partial<Record<MealKey, string[]>>>({});
+  const [addPickerOpen, setAddPickerOpen] = useState<Partial<Record<MealKey, boolean>>>({});
+  const [savePanelOpen, setSavePanelOpen] = useState<Partial<Record<MealKey, boolean>>>({});
+  const chefInitialized = useRef(false);
 
   useEffect(() => {
     api.getPlan().then(setItems).catch(() => setItems([]));
     api.getPlanUploads().then(setUploads).catch(() => setUploads([]));
+    api.getChefCombos().then(setCombos).catch(() => setCombos([]));
   }, []);
 
-  const poolFor = (categories: string[]) => (items ?? []).filter((it) => it.name.trim() && categories.includes(it.category));
+  const poolFor = (category: string) => (items ?? []).filter((it) => it.name.trim() && it.category === category);
+  const randomSlotsFor = (meal: MealKey): ChefDraftSlot[] =>
+    CHEF_STARTER_CATEGORIES[meal].map((category) => ({ category, item: pickRandom(poolFor(category)) }));
 
-  const generateChef = () => {
-    const menu = {} as Record<MealKey, (PlanItem | null)[]>;
-    for (const meal of MEAL_ORDER) {
-      menu[meal] = CHEF_SLOTS[meal].map((slot) => pickRandom(poolFor(slot.categories)));
-    }
-    setChefMenu(menu);
+  const applyCombo = (meal: MealKey, combo: ChefCombo) => {
+    setDraft((d) => ({
+      ...d,
+      [meal]: combo.slots.map((s) => ({ category: s.category, item: { name: s.name, quantity: s.quantity, category: s.category, maxPerWeek: '' } })),
+    }));
+    setEditingComboId((e) => ({ ...e, [meal]: combo.id }));
+    setDaysDraft((dd) => ({ ...dd, [meal]: combo.days }));
+    setSavePanelOpen((s) => ({ ...s, [meal]: false }));
+    setAddPickerOpen((s) => ({ ...s, [meal]: false }));
   };
 
-  const swapChefSlot = (meal: MealKey, slotIndex: number) => {
-    const slot = CHEF_SLOTS[meal][slotIndex];
-    const current = chefMenu?.[meal][slotIndex] ?? null;
-    const next = pickRandom(poolFor(slot.categories), current);
-    setChefMenu((m) => (m ? { ...m, [meal]: m[meal].map((p, i) => (i === slotIndex ? next : p)) } : m));
+  const startFresh = (meal: MealKey) => {
+    setDraft((d) => ({ ...d, [meal]: randomSlotsFor(meal) }));
+    setEditingComboId((e) => { const next = { ...e }; delete next[meal]; return next; });
+    setDaysDraft((dd) => { const next = { ...dd }; delete next[meal]; return next; });
+    setSavePanelOpen((s) => ({ ...s, [meal]: false }));
+    setAddPickerOpen((s) => ({ ...s, [meal]: false }));
   };
 
+  // Al primo caricamento, per ogni pasto: se esiste una combo salvata valida
+  // per oggi la mostra, altrimenti genera un menu casuale di partenza.
   useEffect(() => {
-    if (items && items.length > 0 && !chefMenu) generateChef();
+    if (chefInitialized.current || !items || combos === null) return;
+    chefInitialized.current = true;
+    const today = chefTodayCode();
+    for (const meal of MEAL_ORDER) {
+      const match = combos.find((c) => c.mealKey === meal && c.days.includes(today));
+      if (match) applyCombo(meal, match);
+      else setDraft((d) => ({ ...d, [meal]: randomSlotsFor(meal) }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, combos]);
+
+  const swapSlot = (meal: MealKey, i: number) => {
+    setDraft((d) => {
+      const slots = d[meal] ?? [];
+      const current = slots[i];
+      if (!current) return d;
+      const next = pickRandom(poolFor(current.category), current.item);
+      return { ...d, [meal]: slots.map((s, idx) => (idx === i ? { ...s, item: next } : s)) };
+    });
+  };
+
+  const removeSlot = (meal: MealKey, i: number) =>
+    setDraft((d) => ({ ...d, [meal]: (d[meal] ?? []).filter((_, idx) => idx !== i) }));
+
+  const addSlot = (meal: MealKey, category: string) => {
+    setDraft((d) => ({ ...d, [meal]: [...(d[meal] ?? []), { category, item: pickRandom(poolFor(category)) }] }));
+    setAddPickerOpen((s) => ({ ...s, [meal]: false }));
+  };
+
+  const availableCategoriesFor = (meal: MealKey) => {
+    const used = new Set((draft[meal] ?? []).map((s) => s.category));
+    return PLAN_CATEGORIES.filter((c) => !used.has(c) && poolFor(c).length > 0);
+  };
+
+  const toggleChefDay = (meal: MealKey, day: string) =>
+    setDaysDraft((dd) => {
+      const current = dd[meal] ?? [];
+      return { ...dd, [meal]: current.includes(day) ? current.filter((d) => d !== day) : [...current, day] };
+    });
+
+  const saveCombo = async (meal: MealKey) => {
+    const slots = (draft[meal] ?? [])
+      .filter((s): s is ChefDraftSlot & { item: PlanItem } => !!s.item)
+      .map((s) => ({ category: s.category, name: s.item.name, quantity: s.item.quantity }));
+    const days = daysDraft[meal] ?? [];
+    if (!slots.length || !days.length) return;
+    const result = await api.saveChefCombo({ id: editingComboId[meal], mealKey: meal, days, slots });
+    setCombos(result.combos);
+    setEditingComboId((e) => ({ ...e, [meal]: result.id }));
+    setSavePanelOpen((s) => ({ ...s, [meal]: false }));
+  };
+
+  const deleteCombo = async (meal: MealKey, id: number) => {
+    const updated = await api.deleteChefCombo(id);
+    setCombos(updated);
+    if (editingComboId[meal] === id) startFresh(meal);
+  };
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -237,44 +305,114 @@ export function PianoView({ patientName }: Props) {
           {items.length > 0 && (
             <>
               <div className="nm-section-label" style={{ marginTop: 20 }}>Chef</div>
-              <div className="nm-page-sub">Un'idea di pasto completo per oggi, pescata dal tuo piano. Un'opzione non ti convince? Cambiala.</div>
-              {MEAL_ORDER.map((meal) => (
-                <div key={meal} className="nm-chef-card">
-                  <div className="nm-chef-card-head">
-                    <MealIcon meal={meal} size={17} color="var(--teal-700)" />
-                    <span>{MEAL_LABEL[meal]}</span>
-                  </div>
-                  {CHEF_SLOTS[meal].map((slot, i) => {
-                    const pick = chefMenu?.[meal]?.[i] ?? null;
-                    const swappable = poolFor(slot.categories).length > 1;
-                    return (
+              <div className="nm-page-sub">Un'idea di pasto completo, pescata dal tuo piano. Aggiungi, togli o cambia una voce, poi salvala come combo per i giorni che vuoi.</div>
+              {MEAL_ORDER.map((meal) => {
+                const mealCombos = (combos ?? []).filter((c) => c.mealKey === meal);
+                const slots = draft[meal] ?? [];
+                const availableCats = availableCategoriesFor(meal);
+                return (
+                  <div key={meal} className="nm-chef-card">
+                    <div className="nm-chef-card-head">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <MealIcon meal={meal} size={17} color="var(--teal-700)" />
+                        <span>{MEAL_LABEL[meal]}</span>
+                      </div>
+                      <button className="nm-plan-row-icon-btn" onClick={() => startFresh(meal)} aria-label={`Nuova combinazione casuale per ${MEAL_LABEL[meal].toLowerCase()}`}>
+                        <RefreshIcon size={15} />
+                      </button>
+                    </div>
+
+                    {mealCombos.length > 0 && (
+                      <div className="nm-chip-row" style={{ padding: '10px 14px 0' }}>
+                        {mealCombos.map((c) => (
+                          <button
+                            key={c.id}
+                            className={`nm-chip ${editingComboId[meal] === c.id ? 'is-on' : 'is-off'}`}
+                            onClick={() => applyCombo(meal, c)}
+                          >
+                            {c.days.map((d) => CHEF_DAY_LABEL[d]).join('')}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {slots.map((slot, i) => (
                       <div key={i} className="nm-chef-slot">
                         <div className="nm-chef-slot-info">
-                          <span className="nm-chef-slot-cat">{slot.label}</span>
-                          {pick ? (
-                            <span className="nm-chef-slot-name">{pick.name}{pick.quantity ? ` · ${pick.quantity}` : ''}</span>
+                          <span className="nm-chef-slot-cat">{slot.category}</span>
+                          {slot.item ? (
+                            <span className="nm-chef-slot-name">{slot.item.name}{slot.item.quantity ? ` · ${slot.item.quantity}` : ''}</span>
                           ) : (
                             <span className="nm-chef-slot-empty">Niente nel piano per questa categoria</span>
                           )}
                         </div>
-                        {pick && (
-                          <button
-                            className="nm-plan-row-icon-btn"
-                            onClick={() => swapChefSlot(meal, i)}
-                            disabled={!swappable}
-                            aria-label={`Cambia ${slot.label.toLowerCase()} per ${MEAL_LABEL[meal].toLowerCase()}`}
-                          >
+                        {slot.item && poolFor(slot.category).length > 1 && (
+                          <button className="nm-plan-row-icon-btn" onClick={() => swapSlot(meal, i)} aria-label={`Cambia ${slot.category.toLowerCase()}`}>
                             <RefreshIcon size={15} />
                           </button>
                         )}
+                        <button className="nm-plan-row-icon-btn" onClick={() => removeSlot(meal, i)} aria-label={`Rimuovi ${slot.category.toLowerCase()}`}>
+                          <TrashIcon size={14} />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
-              <button className="nm-onboard-add-btn" onClick={generateChef}>
-                <RefreshIcon size={14} /> Nuovo menu del giorno
-              </button>
+                    ))}
+
+                    {addPickerOpen[meal] ? (
+                      availableCats.length > 0 ? (
+                        <div className="nm-chip-row" style={{ padding: '8px 14px' }}>
+                          {availableCats.map((cat) => (
+                            <button key={cat} className="nm-chip is-off" onClick={() => addSlot(meal, cat)}>{cat}</button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="nm-hint" style={{ padding: '0 14px 8px' }}>Nessun'altra categoria disponibile nel piano.</div>
+                      )
+                    ) : (
+                      <button className="nm-onboard-add-btn" onClick={() => setAddPickerOpen((s) => ({ ...s, [meal]: true }))}>
+                        <PlusIcon size={14} /> Aggiungi macro
+                      </button>
+                    )}
+
+                    {savePanelOpen[meal] ? (
+                      <div style={{ padding: '10px 14px 14px' }}>
+                        <div className="nm-hint">Quando vuoi mangiare questa combinazione?</div>
+                        <div className="nm-chip-row" style={{ marginTop: 8 }}>
+                          {CHEF_DAYS.map((d) => (
+                            <button
+                              key={d}
+                              className={`nm-chip ${(daysDraft[meal] ?? []).includes(d) ? 'is-on' : 'is-off'}`}
+                              onClick={() => toggleChefDay(meal, d)}
+                            >
+                              {CHEF_DAY_LABEL[d]}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          className="nm-submit-btn"
+                          disabled={!(daysDraft[meal] ?? []).length || !slots.some((s) => s.item)}
+                          onClick={() => saveCombo(meal)}
+                        >
+                          {editingComboId[meal] ? 'Aggiorna combo' : 'Salva combo'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="nm-onboard-add-btn" onClick={() => setSavePanelOpen((s) => ({ ...s, [meal]: true }))}>
+                        Salva come combo preferita
+                      </button>
+                    )}
+
+                    {editingComboId[meal] !== undefined && (
+                      <button
+                        className="nm-onboard-add-btn"
+                        style={{ borderStyle: 'solid', color: 'var(--bad-fg-strong)' }}
+                        onClick={() => deleteCombo(meal, editingComboId[meal]!)}
+                      >
+                        <TrashIcon size={14} /> Elimina questa combo
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </>
           )}
 

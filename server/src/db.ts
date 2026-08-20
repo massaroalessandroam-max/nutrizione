@@ -188,6 +188,45 @@ export async function initDb(): Promise<void> {
     );
   `);
 
+  // Integratori personali del paziente, oltre al catalogo curato Nemis
+  // (statico, in supplementCatalog.ts). Stesso pattern di
+  // nutrition_plan_items: idx scelto dal client, sostituzione in blocco.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS patient_supplements (
+      idx INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      dosage TEXT NOT NULL DEFAULT ''
+    );
+  `);
+  // Log assunzioni: a differenza dei pasti (un orario = "adesso", imposto
+  // dal server) qui l'orario è scelto dal paziente perché può registrare a
+  // posteriori ("l'ho preso stamattina"), quindi più righe per prodotto per
+  // giorno invece di una entry sola per chiave.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS supplement_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      quantity TEXT NOT NULL,
+      time TEXT NOT NULL
+    );
+  `);
+
+  // Combo Chef salvate dal paziente: un elenco di macro-categorie con
+  // l'alimento scelto per ciascuna, per un pasto, valide solo nei giorni
+  // della settimana indicati (es. "colazione feriale" lun-ven, "colazione
+  // domenica" solo dom). Sostituiscono la generazione casuale per i giorni
+  // che coprono — days/slots sono JSON perché la forma è piccola e non va
+  // interrogata via SQL.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS chef_combos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      meal_key TEXT NOT NULL,
+      days TEXT NOT NULL,
+      slots TEXT NOT NULL
+    );
+  `);
+
   await ensureAppStateRow();
 }
 

@@ -3,24 +3,9 @@ import { db } from '../db.js';
 import { ORDER, LABEL, isMealKey, type MealKey } from '../constants.js';
 import { score, verdict, verdictOf, pointsForFoods, foodMatches, type MatchContext } from '../match.js';
 import { computeStreak, computeWeek, computeBadges } from '../stats.js';
+import { romeParts, todayStr } from '../time.js';
 
 export const stateRouter = Router();
-
-// Il server (Render) gira in UTC; il paziente è in Italia, quindi data e ora
-// vanno derivate nel fuso Europe/Rome (non UTC), altrimenti sia il "giorno"
-// che l'orario registrato sballano di 1-2 ore a seconda dell'ora legale.
-const romeFmt = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Europe/Rome',
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-});
-function romeParts(d = new Date()) {
-  const p = Object.fromEntries(romeFmt.formatToParts(d).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
-}
-
-function todayStr(): string {
-  return romeParts().date;
-}
 
 // Colazione/pranzo/cena hanno un solo orario abituale ciascuno; gli
 // spuntini possono essere più d'uno, quindi vivono in una lista a parte

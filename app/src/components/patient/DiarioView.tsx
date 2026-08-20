@@ -1,7 +1,7 @@
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
-import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon } from '../../icons';
+import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon, PillIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
 import { formatDateLabel } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
@@ -13,9 +13,10 @@ interface Props {
   onGoDigiuno: () => void;
   onDeleteMeal: (key: MealKey) => void;
   onSkipMeal: (key: MealKey, skipped: boolean) => void;
+  onOpenSupplements: () => void;
 }
 
-export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal, onSkipMeal }: Props) {
+export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal, onSkipMeal, onOpenSupplements }: Props) {
   const now = useNow(state.fastActive);
   const elapsedMs = Math.max(0, now - state.fastStart);
   const h = Math.floor(elapsedMs / 3600000);
@@ -165,6 +166,10 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
       <button className="nm-cta" onClick={onOpenLogQuick}>
         <PlusIcon size={19} color="#fff" />
         Registra un pasto
+      </button>
+      <button className="nm-cta-secondary" onClick={onOpenSupplements}>
+        <PillIcon size={15} />
+        Integratori
       </button>
     </div>
   );

@@ -236,6 +236,15 @@ export function MealIcon({ meal, size = 18, color = 'currentColor' }: { meal: st
   );
 }
 
+export function PillIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(45 12 12)" />
+      <path d="M9 9l6 6" />
+    </svg>
+  );
+}
+
 export function RefreshIcon({ size = 14, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

@@ -1,0 +1,69 @@
+import { Router } from 'express';
+import { db } from '../db.js';
+import { isMealKey } from '../constants.js';
+
+export const chefRouter = Router();
+
+const VALID_DAYS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
+
+interface SlotBody { category?: unknown; name?: unknown; quantity?: unknown }
+
+function cleanSlots(input: unknown) {
+  if (!Array.isArray(input)) return [];
+  return (input as SlotBody[])
+    .map((s) => ({
+      category: String(s?.category ?? '').trim(),
+      name: String(s?.name ?? '').trim(),
+      quantity: String(s?.quantity ?? '').trim(),
+    }))
+    .filter((s) => s.name && s.category);
+}
+
+function cleanDays(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.filter((d) => VALID_DAYS.includes(d));
+}
+
+async function allCombos() {
+  const { rows } = await db.execute('SELECT id, meal_key, days, slots FROM chef_combos ORDER BY id');
+  return (rows as any[]).map((r) => ({
+    id: r.id, mealKey: r.meal_key, days: JSON.parse(r.days), slots: JSON.parse(r.slots),
+  }));
+}
+
+chefRouter.get('/chef/combos', async (_req, res) => {
+  res.json(await allCombos());
+});
+
+// Upsert: con id valido aggiorna la combo esistente, altrimenti ne crea una
+// nuova — "modifica" e "salva" sono la stessa azione lato client.
+chefRouter.post('/chef/combos', async (req, res) => {
+  const mealKey = String(req.body?.mealKey ?? '');
+  if (!isMealKey(mealKey)) return res.status(400).json({ error: 'pasto non valido' });
+
+  const days = cleanDays(req.body?.days);
+  const slots = cleanSlots(req.body?.slots);
+  if (!days.length || !slots.length) return res.status(400).json({ error: 'giorni o alimenti mancanti' });
+
+  const id = Number(req.body?.id);
+  let savedId = id;
+  if (Number.isInteger(id) && id > 0) {
+    await db.execute({
+      sql: 'UPDATE chef_combos SET meal_key = ?, days = ?, slots = ? WHERE id = ?',
+      args: [mealKey, JSON.stringify(days), JSON.stringify(slots), id],
+    });
+  } else {
+    const result = await db.execute({
+      sql: 'INSERT INTO chef_combos (meal_key, days, slots) VALUES (?, ?, ?)',
+      args: [mealKey, JSON.stringify(days), JSON.stringify(slots)],
+    });
+    savedId = Number(result.lastInsertRowid);
+  }
+
+  res.json({ id: savedId, combos: await allCombos() });
+});
+
+chefRouter.delete('/chef/combos/:id', async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM chef_combos WHERE id = ?', args: [req.params.id] });
+  res.json(await allCombos());
+});

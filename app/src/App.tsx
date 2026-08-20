@@ -9,6 +9,7 @@ import { PianoView } from './components/patient/PianoView';
 import { ReportView } from './components/patient/ReportView';
 import { LogSheet } from './components/sheet/LogSheet';
 import { SummaryOverlay } from './components/sheet/SummaryOverlay';
+import { SupplementSheet } from './components/sheet/SupplementSheet';
 
 function App() {
   const d = useDiario();
@@ -36,6 +37,7 @@ function App() {
                   onGoDigiuno={d.goDigiuno}
                   onDeleteMeal={d.deleteMeal}
                   onSkipMeal={d.skipMeal}
+                  onOpenSupplements={d.openSupplementSheet}
                 />
               )}
               {d.tab === 'premi' && <PremiView state={d.appState} />}
@@ -72,6 +74,8 @@ function App() {
         )}
 
         <SummaryOverlay open={d.summaryOpen} summary={d.lastSummary} onClose={d.closeSummary} onSend={d.sendFromSummary} />
+
+        <SupplementSheet open={d.supplementSheetOpen} onClose={d.closeSupplementSheet} />
 
         <Toast message={d.toast} />
       </div>

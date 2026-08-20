@@ -185,6 +185,11 @@
   cursor: pointer; box-shadow: var(--shadow-cta);
   display: flex; align-items: center; justify-content: center; gap: 9px;
 }
+.nm-cta-secondary {
+  margin-top: 10px; width: 100%; background: transparent; border: 1.5px solid var(--line-medium);
+  border-radius: 14px; padding: 12px; color: var(--ink-soft); font-size: 13.5px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
 
 /* ===== Premi ===== */
 .nm-page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
@@ -550,7 +555,7 @@
 .nm-plan-row-freq { font-size: 12.5px; color: var(--ink-soft); line-height: 1.25; }
 
 .nm-chef-card { border: 1.5px solid var(--line-medium); border-radius: 14px; margin-bottom: 10px; overflow: hidden; background: var(--card); }
-.nm-chef-card-head { display: flex; align-items: center; gap: 8px; padding: 13px 14px; font-weight: 700; font-size: 14px; color: var(--ink); border-bottom: 1px solid var(--line-soft); }
+.nm-chef-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 14px; font-weight: 700; font-size: 14px; color: var(--ink); border-bottom: 1px solid var(--line-soft); }
 .nm-chef-slot { display: flex; align-items: center; gap: 8px; padding: 9px 14px; }
 .nm-chef-slot + .nm-chef-slot { border-top: 1px solid var(--line-soft); }
 .nm-chef-slot-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

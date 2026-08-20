@@ -45,6 +45,18 @@ export const api = {
   deleteReportRecipient: (id: number) => req<ReportRecipient[]>(`/report/recipients/${id}`, { method: 'DELETE' }),
   getReportHistory: () => req<ReportHistoryEntry[]>('/report/history'),
   getReportHistoryDetail: (id: number) => req<ReportHistoryDetail>(`/report/history/${id}`),
+  getSupplementCatalog: () => req<SupplementCatalogItem[]>('/supplements/catalog'),
+  getCustomSupplements: () => req<CustomSupplement[]>('/supplements/custom'),
+  saveCustomSupplements: (items: CustomSupplement[]) =>
+    req<CustomSupplement[]>('/supplements/custom', { method: 'POST', body: JSON.stringify({ items }) }),
+  getSupplementLog: () => req<SupplementLogEntry[]>('/supplements/log'),
+  logSupplement: (name: string, quantity: string, time: string) =>
+    req<SupplementLogEntry[]>('/supplements/log', { method: 'POST', body: JSON.stringify({ name, quantity, time }) }),
+  deleteSupplementLog: (id: number) => req<SupplementLogEntry[]>(`/supplements/log/${id}`, { method: 'DELETE' }),
+  getChefCombos: () => req<ChefCombo[]>('/chef/combos'),
+  saveChefCombo: (combo: { id?: number; mealKey: MealKey; days: string[]; slots: ChefSlotItem[] }) =>
+    req<{ id: number; combos: ChefCombo[] }>('/chef/combos', { method: 'POST', body: JSON.stringify(combo) }),
+  deleteChefCombo: (id: number) => req<ChefCombo[]>(`/chef/combos/${id}`, { method: 'DELETE' }),
 };
 
 export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
@@ -128,4 +140,35 @@ export interface ReportHistoryEntry {
 
 export interface ReportHistoryDetail extends ReportHistoryEntry {
   bodyText: string;
+}
+
+export interface SupplementCatalogItem {
+  name: string;
+  dosageHint: string;
+  url: string;
+}
+
+export interface CustomSupplement {
+  name: string;
+  dosage: string;
+}
+
+export interface SupplementLogEntry {
+  id: number;
+  name: string;
+  quantity: string;
+  time: string;
+}
+
+export interface ChefSlotItem {
+  category: string;
+  name: string;
+  quantity: string;
+}
+
+export interface ChefCombo {
+  id: number;
+  mealKey: MealKey;
+  days: string[];
+  slots: ChefSlotItem[];
 }

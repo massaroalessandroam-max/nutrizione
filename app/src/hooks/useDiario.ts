@@ -30,6 +30,10 @@ export function useDiario() {
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const [supplementSheetOpen, setSupplementSheetOpen] = useState(false);
+  const openSupplementSheet = useCallback(() => setSupplementSheetOpen(true), []);
+  const closeSupplementSheet = useCallback(() => setSupplementSheetOpen(false), []);
+
   const [patients, setPatients] = useState<PatientListItem[] | null>(null);
   const [activePatientId, setActivePatientId] = useState<string | null>(null);
   const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
@@ -213,6 +217,7 @@ export function useDiario() {
     updateMealFoods,
     skipMeal,
     toggleFast, fastToggling, setFreq, goDigiuno,
+    supplementSheetOpen, openSupplementSheet, closeSupplementSheet,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };
 }
