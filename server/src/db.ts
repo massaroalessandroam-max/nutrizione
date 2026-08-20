@@ -36,6 +36,7 @@ const APP_STATE_MIGRATIONS = [
   "ALTER TABLE app_state ADD COLUMN fast_pref_enabled INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE app_state ADD COLUMN fast_pref_start TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE app_state ADD COLUMN fast_pref_end TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE app_state ADD COLUMN report_send_time TEXT NOT NULL DEFAULT '21:00'",
 ];
 
 // Crea lo schema alla partenza. Va atteso prima di servire richieste: con un
@@ -52,7 +53,8 @@ export async function initDb(): Promise<void> {
       onboarded INTEGER NOT NULL DEFAULT 0,
       fast_pref_enabled INTEGER NOT NULL DEFAULT 0,
       fast_pref_start TEXT NOT NULL DEFAULT '',
-      fast_pref_end TEXT NOT NULL DEFAULT ''
+      fast_pref_end TEXT NOT NULL DEFAULT '',
+      report_send_time TEXT NOT NULL DEFAULT '21:00'
     );
   `);
   for (const migration of APP_STATE_MIGRATIONS) {
@@ -151,6 +153,38 @@ export async function initDb(): Promise<void> {
       media_type TEXT NOT NULL,
       data_base64 TEXT NOT NULL,
       uploaded_at TEXT NOT NULL
+    );
+  `);
+
+  // Destinatari email del report (con alias, es. "Dott.ssa Rossi") e log
+  // degli invii effettuati — l'invio automatico vero e proprio richiede un
+  // servizio email da collegare in seguito; queste tabelle esistono già
+  // pronte per quando sarà attivo.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS report_recipients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      alias TEXT NOT NULL DEFAULT ''
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS report_send_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sent_at TEXT NOT NULL,
+      recipients TEXT NOT NULL,
+      report_from TEXT NOT NULL,
+      report_to TEXT NOT NULL,
+      body_text TEXT NOT NULL
+    );
+  `);
+
+  // Cache delle ripartizioni per categoria (macronutrienti) degli alimenti
+  // registrati che non matchano un alimento del piano: calcolate una volta
+  // via AI e riusate, invece di richiamarla ad ogni apertura del report.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS food_category_weights (
+      food_text TEXT PRIMARY KEY,
+      weights_json TEXT NOT NULL
     );
   `);
 

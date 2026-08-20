@@ -144,6 +144,7 @@ export async function buildState() {
     points: appState.points as number,
     streak,
     freq: appState.freq as string,
+    reportSendTime: appState.report_send_time as string,
     fastActive: !!appState.fast_active,
     fastStart: appState.fast_start as number,
     greetingName: appState.greeting_name as string,
@@ -170,6 +171,15 @@ stateRouter.put('/settings/freq', async (req, res) => {
     return res.status(400).json({ error: 'invalid freq' });
   }
   await db.execute({ sql: 'UPDATE app_state SET freq = ? WHERE id = 1', args: [freq] });
+  res.json(await buildState());
+});
+
+stateRouter.put('/settings/report-time', async (req, res) => {
+  const { time } = req.body ?? {};
+  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
+    return res.status(400).json({ error: 'orario non valido' });
+  }
+  await db.execute({ sql: 'UPDATE app_state SET report_send_time = ? WHERE id = 1', args: [time] });
   res.json(await buildState());
 });
 

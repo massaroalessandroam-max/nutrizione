@@ -18,14 +18,7 @@ export function extractJsonArray(text: string): unknown {
 // Lancia un errore con .code = 'api_unavailable' se la chiamata ad Anthropic
 // fallisce (rete/HTTP), per distinguerlo da un errore di parsing della
 // risposta — i chiamanti mostrano messaggi diversi per i due casi.
-export async function callClaudeWithFile(
-  fileBase64: string, mediaType: string, prompt: string, maxTokens: number
-): Promise<string> {
-  const isPdf = mediaType === 'application/pdf';
-  const contentBlock = isPdf
-    ? { type: 'document', source: { type: 'base64', media_type: mediaType, data: fileBase64 } }
-    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: fileBase64 } };
-
+async function callClaude(content: unknown[], maxTokens: number): Promise<string> {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -36,7 +29,7 @@ export async function callClaudeWithFile(
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
       max_tokens: maxTokens,
-      messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompt }] }],
+      messages: [{ role: 'user', content }],
     }),
   });
 
@@ -48,4 +41,18 @@ export async function callClaudeWithFile(
 
   const data = (await resp.json()) as { content?: Array<{ text?: string }> };
   return data.content?.[0]?.text ?? '';
+}
+
+export async function callClaudeWithFile(
+  fileBase64: string, mediaType: string, prompt: string, maxTokens: number
+): Promise<string> {
+  const isPdf = mediaType === 'application/pdf';
+  const contentBlock = isPdf
+    ? { type: 'document', source: { type: 'base64', media_type: mediaType, data: fileBase64 } }
+    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: fileBase64 } };
+  return callClaude([contentBlock, { type: 'text', text: prompt }], maxTokens);
+}
+
+export async function callClaudeText(prompt: string, maxTokens: number): Promise<string> {
+  return callClaude([{ type: 'text', text: prompt }], maxTokens);
 }

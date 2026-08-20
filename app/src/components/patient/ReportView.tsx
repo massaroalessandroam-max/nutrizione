@@ -1,23 +1,24 @@
 import { useEffect, useState } from 'react';
 import type { AppState } from '../../types';
-import { api, type Report } from '../../api';
-import { PdfIcon, WhatsappIcon } from '../../icons';
+import { api, type Report, type ReportMacros, type ReportRecipient, type ReportHistoryEntry, type ReportHistoryDetail } from '../../api';
+import { PdfIcon, WhatsappIcon, SettingsIcon, TrashIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
 import { formatDateLabel } from '../../lib/mealMeta';
 import { buildReportWhatsappText, buildWhatsappLink } from '../../lib/whatsapp';
 import { buildReportPdf } from '../../lib/pdf';
 import { ReportCalendar, toISODate } from '../ReportCalendar';
+import { MacroCompareChart } from '../MacroCompareChart';
 
 interface Props {
   state: AppState;
   onSetFreq: (freq: AppState['freq']) => void;
 }
 
-const FREQ: Array<{ key: AppState['freq']; label: string; desc: string }> = [
-  { key: 'meal', label: 'Ad ogni pasto', desc: 'Invio automatico dopo ogni registrazione' },
-  { key: 'multi', label: 'Più pasti insieme', desc: 'Raggruppa e invia 2-3 volte al giorno' },
-  { key: 'day', label: 'Una volta al giorno', desc: 'Riepilogo serale completo, ore 21:00' },
-  { key: 'manual', label: 'Solo manuale', desc: 'Invii tu quando vuoi' },
+const FREQ: Array<{ key: AppState['freq']; label: string }> = [
+  { key: 'meal', label: 'Ad ogni pasto — invio automatico dopo ogni registrazione' },
+  { key: 'multi', label: 'Più pasti insieme — raggruppa e invia 2-3 volte al giorno' },
+  { key: 'day', label: 'Una volta al giorno — riepilogo serale completo' },
+  { key: 'manual', label: 'Solo manuale — invii tu quando vuoi' },
 ];
 
 type Preset = 'oggi' | 'ieri' | 'settimana' | 'mese' | 'anno';
@@ -62,7 +63,16 @@ export function ReportView({ state, onSetFreq }: Props) {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [activityDates, setActivityDates] = useState<Set<string>>(new Set());
   const [report, setReport] = useState<Report | null>(null);
+  const [macros, setMacros] = useState<ReportMacros | null>(null);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; blob: Blob } | null>(null);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recipients, setRecipients] = useState<ReportRecipient[] | null>(null);
+  const [newEmail, setNewEmail] = useState('');
+  const [newAlias, setNewAlias] = useState('');
+  const [history, setHistory] = useState<ReportHistoryEntry[] | null>(null);
+  const [openHistoryId, setOpenHistoryId] = useState<number | null>(null);
+  const [historyDetail, setHistoryDetail] = useState<ReportHistoryDetail | null>(null);
 
   useEffect(() => {
     const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
@@ -71,7 +81,14 @@ export function ReportView({ state, onSetFreq }: Props) {
 
   useEffect(() => {
     api.getReport(rangeStart, rangeEnd).then(setReport).catch(() => setReport(null));
+    api.getReportMacros(rangeStart, rangeEnd).then(setMacros).catch(() => setMacros(null));
   }, [rangeStart, rangeEnd]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    api.getReportRecipients().then(setRecipients).catch(() => setRecipients([]));
+    api.getReportHistory().then(setHistory).catch(() => setHistory([]));
+  }, [settingsOpen]);
 
   // Rilascia l'URL del blob quando cambia o quando si chiude l'anteprima,
   // altrimenti resta in memoria finché non si ricarica la pagina.
@@ -137,13 +154,45 @@ export function ReportView({ state, onSetFreq }: Props) {
     }
   };
 
+  const addRecipient = async () => {
+    if (!newEmail.trim()) return;
+    const list = await api.addReportRecipient(newEmail.trim(), newAlias.trim());
+    setRecipients(list);
+    setNewEmail('');
+    setNewAlias('');
+  };
+
+  const removeRecipient = async (id: number) => {
+    const list = await api.deleteReportRecipient(id);
+    setRecipients(list);
+  };
+
+  const toggleHistoryEntry = async (id: number) => {
+    if (openHistoryId === id) {
+      setOpenHistoryId(null);
+      setHistoryDetail(null);
+      return;
+    }
+    setOpenHistoryId(id);
+    setHistoryDetail(null);
+    const detail = await api.getReportHistoryDetail(id);
+    setHistoryDetail(detail);
+  };
+
   const waHref = report ? buildWhatsappLink(buildReportWhatsappText(report, state.greetingName)) : '';
   const rangeLabel = rangeStart === rangeEnd ? formatDateLabel(rangeStart) : `${rangeStart} → ${rangeEnd}`;
 
   return (
     <div className="nm-section">
-      <div className="nm-page-title">Report al nutrizionista</div>
-      <div className="nm-page-sub">Decidi tu quando e come inviare il diario.</div>
+      <div className="nm-plan-section-head">
+        <div>
+          <div className="nm-page-title">Report al nutrizionista</div>
+          <div className="nm-page-sub">Decidi tu quando e come inviare il diario.</div>
+        </div>
+        <button className="nm-icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Impostazioni invio">
+          <SettingsIcon size={19} color="var(--teal-700)" />
+        </button>
+      </div>
 
       <div className="nm-section-label">Periodo</div>
       <div className="nm-chip-row">
@@ -162,23 +211,8 @@ export function ReportView({ state, onSetFreq }: Props) {
         onSelectDay={handleSelectDay}
       />
 
-      <div className="nm-section-label">Quando inviare</div>
-      <div className="nm-freq-list">
-        {FREQ.map((f) => {
-          const on = state.freq === f.key;
-          return (
-            <button key={f.key} className={`nm-freq-option ${on ? 'is-on' : 'is-off'}`} onClick={() => onSetFreq(f.key)}>
-              <div className="nm-freq-dot" style={{ borderColor: on ? 'var(--teal-700)' : 'var(--line-strong)' }}>
-                <div className="nm-freq-dot-fill" style={{ background: on ? 'var(--teal-700)' : 'transparent' }} />
-              </div>
-              <div className="nm-freq-text">
-                <div className="nm-freq-label">{f.label}</div>
-                <div className="nm-freq-desc">{f.desc}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      <div className="nm-section-label">Macronutrienti · vs periodo precedente</div>
+      {macros ? <MacroCompareChart macros={macros} /> : <div className="nm-hint">Caricamento…</div>}
 
       <div className="nm-report-preview">
         <div className="nm-report-preview-head">
@@ -231,6 +265,74 @@ export function ReportView({ state, onSetFreq }: Props) {
               {shareSupported && (
                 <button className="nm-modal-btn nm-modal-btn-primary" onClick={sharePdf}>Condividi</button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="nm-modal-overlay">
+          <div className="nm-pdf-modal-card nm-settings-card">
+            <button className="nm-modal-close" onClick={() => setSettingsOpen(false)} aria-label="Chiudi impostazioni">×</button>
+            <div className="nm-settings-scroll">
+              <div className="nm-settings-title">Impostazioni invio</div>
+
+              <div className="nm-section-label">Quando inviare</div>
+              <select
+                className="nm-text-input"
+                value={state.freq}
+                onChange={(e) => onSetFreq(e.target.value as AppState['freq'])}
+              >
+                {FREQ.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+              </select>
+
+              <div className="nm-section-label" style={{ marginTop: 18 }}>Orario di invio</div>
+              <input
+                className="nm-text-input"
+                type="time"
+                value={state.reportSendTime}
+                onChange={(e) => api.setReportTime(e.target.value)}
+              />
+              <div className="nm-hint">L'invio automatico via email parte non appena colleghiamo un servizio email — per ora imposti qui orario e destinatari.</div>
+
+              <div className="nm-section-label" style={{ marginTop: 18 }}>Destinatari email</div>
+              {(recipients ?? []).map((r) => (
+                <div key={r.id} className="nm-logged-food-row">
+                  <div className="nm-text-input" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontWeight: 600 }}>{r.alias || r.email}</span>
+                    {r.alias && <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{r.email}</span>}
+                  </div>
+                  <button className="nm-plan-row-icon-btn" onClick={() => removeRecipient(r.id)} aria-label={`Rimuovi ${r.email}`}>
+                    <TrashIcon size={15} />
+                  </button>
+                </div>
+              ))}
+              <div className="nm-plan-item-bottom" style={{ marginTop: 8 }}>
+                <input className="nm-text-input" placeholder="Alias, es. Dott.ssa Rossi" value={newAlias} onChange={(e) => setNewAlias(e.target.value)} />
+                <input className="nm-text-input" placeholder="email@esempio.it" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              </div>
+              <button className="nm-onboard-add-btn" onClick={addRecipient}>+ Aggiungi destinatario</button>
+
+              <div className="nm-section-label" style={{ marginTop: 18 }}>Storico invii</div>
+              {history !== null && history.length === 0 && (
+                <div className="nm-hint">Ancora nessun invio — comparirà qui non appena l'invio email sarà attivo.</div>
+              )}
+              {history?.map((h) => (
+                <div key={h.id} className="nm-plan-category">
+                  <button className="nm-plan-category-head" onClick={() => toggleHistoryEntry(h.id)}>
+                    <span>{h.sentAt} · {h.recipients.join(', ')}</span>
+                  </button>
+                  {openHistoryId === h.id && (
+                    <div className="nm-plan-category-body">
+                      {historyDetail ? (
+                        <pre className="nm-history-text">{historyDetail.bodyText}</pre>
+                      ) : (
+                        <div className="nm-hint">Caricamento…</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -57,6 +57,7 @@ export interface AppState {
   points: number;
   streak: number;
   freq: 'meal' | 'multi' | 'day' | 'manual';
+  reportSendTime: string;
   fastActive: boolean;
   fastStart: number;
   greetingName: string;

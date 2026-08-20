@@ -37,6 +37,14 @@ export const api = {
   getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
   getReportActivity: (month: string) => req<string[]>(`/report/activity?month=${month}`),
   getReport: (from: string, to: string) => req<Report>(`/report?from=${from}&to=${to}`),
+  getReportMacros: (from: string, to: string) => req<ReportMacros>(`/report/macros?from=${from}&to=${to}`),
+  setReportTime: (time: string) => req<AppState>('/settings/report-time', { method: 'PUT', body: JSON.stringify({ time }) }),
+  getReportRecipients: () => req<ReportRecipient[]>('/report/recipients'),
+  addReportRecipient: (email: string, alias: string) =>
+    req<ReportRecipient[]>('/report/recipients', { method: 'POST', body: JSON.stringify({ email, alias }) }),
+  deleteReportRecipient: (id: number) => req<ReportRecipient[]>(`/report/recipients/${id}`, { method: 'DELETE' }),
+  getReportHistory: () => req<ReportHistoryEntry[]>('/report/history'),
+  getReportHistoryDetail: (id: number) => req<ReportHistoryDetail>(`/report/history/${id}`),
 };
 
 export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
@@ -79,4 +87,45 @@ export interface Report {
   days: ReportDay[];
   totalMeals: number;
   adherencePct: number;
+}
+
+export interface ReportMacroItem {
+  date: string;
+  food: string;
+  weight: number;
+}
+
+export interface ReportMacroCategory {
+  pct: number;
+  items: ReportMacroItem[];
+}
+
+export interface ReportMacroPeriod {
+  from: string;
+  to: string;
+  total: number;
+  categories: Record<string, ReportMacroCategory>;
+}
+
+export interface ReportMacros {
+  current: ReportMacroPeriod;
+  previous: ReportMacroPeriod;
+}
+
+export interface ReportRecipient {
+  id: number;
+  email: string;
+  alias: string;
+}
+
+export interface ReportHistoryEntry {
+  id: number;
+  sentAt: string;
+  recipients: string[];
+  from: string;
+  to: string;
+}
+
+export interface ReportHistoryDetail extends ReportHistoryEntry {
+  bodyText: string;
 }
