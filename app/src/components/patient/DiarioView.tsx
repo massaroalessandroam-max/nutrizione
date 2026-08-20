@@ -1,9 +1,9 @@
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
-import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon } from '../../icons';
+import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
-import { MEAL_SHORT, formatDateLabel } from '../../lib/mealMeta';
+import { formatDateLabel } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
 
 interface Props {
@@ -100,7 +100,7 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
             <div key={key} className={`nm-meal-card ${meal.done ? 'is-done' : ''}`}>
               <button className="nm-meal-card-main" onClick={() => onOpenMeal(key)}>
                 <div className="nm-meal-icon" style={{ background: meal.done ? 'var(--card)' : 'var(--neutral-chip)' }}>
-                  <span style={{ color: meal.done ? 'var(--teal-900)' : 'var(--ink-faint)' }}>{MEAL_SHORT[key]}</span>
+                  <MealIcon meal={key} size={20} color={meal.done ? 'var(--teal-900)' : 'var(--ink-faint)'} />
                 </div>
                 <div className="nm-meal-body">
                   <div className="nm-meal-title-row">

@@ -202,3 +202,36 @@ export function CheckIcon({ size = 16, color = 'var(--gold)', strokeWidth = 2.4 
     </svg>
   );
 }
+
+const MEAL_PATHS: Record<string, ReactElement> = {
+  colazione: ( // tazza di caffè
+    <>
+      <path d="M4 8h13v6a5 5 0 01-5 5H9a5 5 0 01-5-5z" />
+      <path d="M17 10h1.5a2.5 2.5 0 010 5H17" />
+      <path d="M8 3c-.5.7-.5 1.3 0 2M12 3c-.5.7-.5 1.3 0 2" />
+    </>
+  ),
+  pranzo: ( // piatto con posate
+    <>
+      <circle cx="12" cy="13" r="7" />
+      <path d="M9 8v4M11 8v4M9 10h2M15 8v10M15 8c1.5 0 1.5 2 0 3" />
+    </>
+  ),
+  cena: ( // luna
+    <path d="M18 13.5A7.5 7.5 0 019.5 5 7.5 7.5 0 1018 13.5z" />
+  ),
+  spuntino: ( // mela
+    <>
+      <path d="M12 9c-3 0-5 2.2-5 5.2C7 18 9.2 21 11 21c.8 0 1.2-.4 2-.4s1.2.4 2 .4c1.8 0 4-3 4-6.8C19 11.2 17 9 14 9c-.8 0-1.4.3-2 .3s-1.2-.3-2-.3z" />
+      <path d="M12.2 9c0-1.5.8-2.5 2-3" />
+    </>
+  ),
+};
+
+export function MealIcon({ meal, size = 18, color = 'currentColor' }: { meal: string; size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      {MEAL_PATHS[meal] ?? MEAL_PATHS.spuntino}
+    </svg>
+  );
+}

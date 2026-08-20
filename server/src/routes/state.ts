@@ -6,8 +6,20 @@ import { computeStreak, computeWeek, computeBadges } from '../stats.js';
 
 export const stateRouter = Router();
 
+// Il server (Render) gira in UTC; il paziente è in Italia, quindi data e ora
+// vanno derivate nel fuso Europe/Rome (non UTC), altrimenti sia il "giorno"
+// che l'orario registrato sballano di 1-2 ore a seconda dell'ora legale.
+const romeFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Rome',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+function romeParts(d = new Date()) {
+  const p = Object.fromEntries(romeFmt.formatToParts(d).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return romeParts().date;
 }
 
 // Colazione/pranzo/cena hanno un solo orario abituale ciascuno; gli
@@ -204,7 +216,7 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
   if (!foods.length) return res.status(400).json({ error: 'no foods provided' });
 
   const date = todayStr();
-  const time = new Date().toTimeString().slice(0, 5);
+  const time = romeParts().time;
 
   // Un pasto può accumulare più registrazioni nello stesso giorno (es.
   // yogurt alle 6, colazione completa con uova e pane alle 8): i nuovi
@@ -264,7 +276,7 @@ stateRouter.put('/meals/:key/log', async (req, res) => {
   const newPts = pointsForFoods(foods, ctx);
   await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ? + ?) WHERE id = 1', args: [oldPts, newPts] });
 
-  const time = new Date().toTimeString().slice(0, 5);
+  const time = romeParts().time;
   await db.execute({
     sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, ?, ?, 0)
           ON CONFLICT(date, meal_key) DO UPDATE SET done = excluded.done, foods = excluded.foods, time = excluded.time, skipped = 0`,
