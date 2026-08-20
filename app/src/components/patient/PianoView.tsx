@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, planUploadDownloadUrl, type PlanItem, type PlanUpload } from '../../api';
-import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon } from '../../icons';
+import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
 import { fileToBase64 } from '../../lib/file';
+import { MEAL_LABEL } from '../../lib/mealMeta';
+import { MEAL_ORDER, type MealKey } from '../../types';
 
 const MAX_PER_WEEK_LABEL: Record<string, string> = {
   '': '-', '1': '1 volta/sett.', '2': '2 volte/sett.', '3': '3 volte/sett.', sempre: 'Sempre', opzionale: 'Opzionale',
@@ -11,6 +13,40 @@ const MAX_PER_WEEK_LABEL: Record<string, string> = {
 const MAX_PER_WEEK_SELECT_OPTIONS = ['', ...MAX_PER_WEEK_OPTIONS];
 const OTHER_CATEGORY = 'Altro';
 const GROUPS = [...PLAN_CATEGORIES, OTHER_CATEGORY];
+
+// Composizione di un pasto "completo" per lo Chef: per ciascun pasto, le
+// macro-categorie che deve avere. Proteine e Legumi condividono lo slot
+// proteico (nel piano italiano sono fonti alternative), Grassi fa da
+// condimento. Regola fissa e ragionevole, non configurabile: se in futuro
+// serve personalizzarla per paziente, va spostata lato server nel piano.
+interface ChefSlot { label: string; categories: string[] }
+const CHEF_SLOTS: Record<MealKey, ChefSlot[]> = {
+  colazione: [
+    { label: 'Carboidrati', categories: ['Carboidrati'] },
+    { label: 'Latticini', categories: ['Latticini'] },
+    { label: 'Frutta', categories: ['Frutta'] },
+  ],
+  pranzo: [
+    { label: 'Carboidrati', categories: ['Carboidrati'] },
+    { label: 'Proteine', categories: ['Proteine', 'Legumi'] },
+    { label: 'Verdura', categories: ['Verdura'] },
+    { label: 'Condimento', categories: ['Grassi'] },
+  ],
+  cena: [
+    { label: 'Proteine', categories: ['Proteine', 'Legumi'] },
+    { label: 'Verdura', categories: ['Verdura'] },
+    { label: 'Condimento', categories: ['Grassi'] },
+  ],
+  spuntino: [
+    { label: 'Spuntino', categories: ['Frutta', 'Latticini', 'Grassi'] },
+  ],
+};
+
+function pickRandom(pool: PlanItem[], exclude?: PlanItem | null): PlanItem | null {
+  const options = exclude ? pool.filter((x) => x !== exclude) : pool;
+  const from = options.length ? options : pool;
+  return from.length ? from[Math.floor(Math.random() * from.length)] : null;
+}
 
 function formatUploadDate(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -36,11 +72,37 @@ export function PianoView({ patientName }: Props) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [uploads, setUploads] = useState<PlanUpload[] | null>(null);
+  // "Alimenti" è chiuso finché il paziente non tocca il titolo per
+  // esplorare le macro-categorie del piano.
+  const [alimentiOpen, setAlimentiOpen] = useState(false);
+  const [chefMenu, setChefMenu] = useState<Record<MealKey, (PlanItem | null)[]> | null>(null);
 
   useEffect(() => {
     api.getPlan().then(setItems).catch(() => setItems([]));
     api.getPlanUploads().then(setUploads).catch(() => setUploads([]));
   }, []);
+
+  const poolFor = (categories: string[]) => (items ?? []).filter((it) => it.name.trim() && categories.includes(it.category));
+
+  const generateChef = () => {
+    const menu = {} as Record<MealKey, (PlanItem | null)[]>;
+    for (const meal of MEAL_ORDER) {
+      menu[meal] = CHEF_SLOTS[meal].map((slot) => pickRandom(poolFor(slot.categories)));
+    }
+    setChefMenu(menu);
+  };
+
+  const swapChefSlot = (meal: MealKey, slotIndex: number) => {
+    const slot = CHEF_SLOTS[meal][slotIndex];
+    const current = chefMenu?.[meal][slotIndex] ?? null;
+    const next = pickRandom(poolFor(slot.categories), current);
+    setChefMenu((m) => (m ? { ...m, [meal]: m[meal].map((p, i) => (i === slotIndex ? next : p)) } : m));
+  };
+
+  useEffect(() => {
+    if (items && items.length > 0 && !chefMenu) generateChef();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -172,17 +234,64 @@ export function PianoView({ patientName }: Props) {
         <div className="nm-empty-state">Caricamento…</div>
       ) : (
         <>
-          <div className="nm-plan-section-head">
-            <div className="nm-section-label" style={{ marginTop: 20, marginBottom: 0 }}>Alimenti</div>
+          {items.length > 0 && (
+            <>
+              <div className="nm-section-label" style={{ marginTop: 20 }}>Chef</div>
+              <div className="nm-page-sub">Un'idea di pasto completo per oggi, pescata dal tuo piano. Un'opzione non ti convince? Cambiala.</div>
+              {MEAL_ORDER.map((meal) => (
+                <div key={meal} className="nm-chef-card">
+                  <div className="nm-chef-card-head">
+                    <MealIcon meal={meal} size={17} color="var(--teal-700)" />
+                    <span>{MEAL_LABEL[meal]}</span>
+                  </div>
+                  {CHEF_SLOTS[meal].map((slot, i) => {
+                    const pick = chefMenu?.[meal]?.[i] ?? null;
+                    const swappable = poolFor(slot.categories).length > 1;
+                    return (
+                      <div key={i} className="nm-chef-slot">
+                        <div className="nm-chef-slot-info">
+                          <span className="nm-chef-slot-cat">{slot.label}</span>
+                          {pick ? (
+                            <span className="nm-chef-slot-name">{pick.name}{pick.quantity ? ` · ${pick.quantity}` : ''}</span>
+                          ) : (
+                            <span className="nm-chef-slot-empty">Niente nel piano per questa categoria</span>
+                          )}
+                        </div>
+                        {pick && (
+                          <button
+                            className="nm-plan-row-icon-btn"
+                            onClick={() => swapChefSlot(meal, i)}
+                            disabled={!swappable}
+                            aria-label={`Cambia ${slot.label.toLowerCase()} per ${MEAL_LABEL[meal].toLowerCase()}`}
+                          >
+                            <RefreshIcon size={15} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <button className="nm-onboard-add-btn" onClick={generateChef}>
+                <RefreshIcon size={14} /> Nuovo menu del giorno
+              </button>
+            </>
+          )}
+
+          <div className="nm-plan-section-head" style={{ marginTop: 26 }}>
+            <button className="nm-suggestions-toggle" onClick={() => setAlimentiOpen((o) => !o)}>
+              Alimenti · {items.length} {alimentiOpen ? '▲' : '▼'}
+            </button>
             {items.length > 0 && (
               <button className="nm-plan-pdf-btn" onClick={downloadPdf} aria-label="Scarica piano in PDF">
                 <PdfIcon size={15} /> PDF
               </button>
             )}
           </div>
-          {items.length === 0 && <div className="nm-hint">Nessun alimento ancora. Carica un file o aggiungi a mano.</div>}
-
-          {groups.map((group) => {
+          {!alimentiOpen ? null : items.length === 0 ? (
+            <div className="nm-hint">Nessun alimento ancora. Carica un file o aggiungi a mano.</div>
+          ) : (
+          groups.map((group) => {
             const isOpen = expanded.has(group.name);
             return (
               <div key={group.name} className="nm-plan-category">
@@ -256,11 +365,14 @@ export function PianoView({ patientName }: Props) {
                 )}
               </div>
             );
-          })}
+          })
+          )}
 
-          <button className="nm-submit-btn" disabled={saving} onClick={save}>
-            {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
-          </button>
+          {alimentiOpen && (
+            <button className="nm-submit-btn" disabled={saving} onClick={save}>
+              {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
+            </button>
+          )}
 
           {uploads !== null && uploads.length > 0 && (
             <>

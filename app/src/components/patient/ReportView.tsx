@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AppState } from '../../types';
 import { api, type Report, type ReportMacros, type ReportRecipient, type ReportHistoryEntry, type ReportHistoryDetail } from '../../api';
-import { PdfIcon, WhatsappIcon, SettingsIcon, TrashIcon } from '../../icons';
-import { badgeClass } from '../../lib/tone';
+import { PdfIcon, WhatsappIcon, SettingsIcon, TrashIcon, ChevronIcon } from '../../icons';
 import { formatDateLabel } from '../../lib/mealMeta';
 import { buildReportWhatsappText, buildWhatsappLink } from '../../lib/whatsapp';
 import { buildReportPdf } from '../../lib/pdf';
@@ -61,10 +60,12 @@ export function ReportView({ state, onSetFreq }: Props) {
   // calendario con due tap): null quando la selezione è già completa.
   const [pendingStart, setPendingStart] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [activityDates, setActivityDates] = useState<Set<string>>(new Set());
   const [report, setReport] = useState<Report | null>(null);
   const [macros, setMacros] = useState<ReportMacros | null>(null);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; blob: Blob } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recipients, setRecipients] = useState<ReportRecipient[] | null>(null);
@@ -201,47 +202,56 @@ export function ReportView({ state, onSetFreq }: Props) {
             {p.label}
           </button>
         ))}
+        <button className={`nm-chip ${calendarOpen ? 'is-on' : 'is-off'}`} onClick={() => setCalendarOpen((o) => !o)}>
+          Scegli date
+        </button>
       </div>
-      <ReportCalendar
-        month={calendarMonth}
-        onMonthChange={setCalendarMonth}
-        activityDates={activityDates}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-        onSelectDay={handleSelectDay}
-      />
+      {calendarOpen && (
+        <ReportCalendar
+          month={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          activityDates={activityDates}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          onSelectDay={handleSelectDay}
+        />
+      )}
 
       <div className="nm-section-label">Macronutrienti · vs periodo precedente</div>
       {macros ? <MacroCompareChart macros={macros} /> : <div className="nm-hint">Caricamento…</div>}
 
       <div className="nm-report-preview">
-        <div className="nm-report-preview-head">
+        <button className="nm-report-preview-head" onClick={() => setPreviewOpen((o) => !o)}>
           <div className="nm-report-preview-head-title">Anteprima report · {rangeLabel}</div>
-          <span className="nm-report-count">{report?.totalMeals ?? 0} pasti</span>
-        </div>
-        <div className="nm-report-preview-body">
-          {report && report.days.length === 0 && <div className="nm-hint">Nessun pasto registrato in questo periodo.</div>}
-          {report?.days.map((day) => (
-            <div key={day.date}>
-              <div className="nm-report-day-label">{formatDateLabel(day.date)}</div>
-              {day.meals.map((m) => (
-                <div key={m.key} className="nm-report-meal-row">
-                  <div>
-                    <span className="nm-report-meal-name">{m.label}</span>{' '}
-                    <span className="nm-report-meal-foods">· {m.foods.slice(0, 3).join(', ')}</span>
+          <div className="nm-report-preview-head-right">
+            <span className="nm-report-count">{report?.totalMeals ?? 0} pasti</span>
+            <ChevronIcon size={16} open={previewOpen} />
+          </div>
+        </button>
+        {previewOpen && (
+          <div className="nm-report-preview-body">
+            {report && report.days.length === 0 && <div className="nm-hint">Nessun pasto registrato in questo periodo.</div>}
+            {report?.days.map((day) => (
+              <div key={day.date}>
+                <div className="nm-report-day-label">{formatDateLabel(day.date)}</div>
+                {day.meals.map((m) => (
+                  <div key={m.key} className="nm-report-meal-row">
+                    <span className="nm-report-meal-name">{m.label}</span>
+                    <ul className="nm-report-meal-list">
+                      {m.foods.map((f, i) => <li key={i}>{f}</li>)}
+                    </ul>
                   </div>
-                  <span className={badgeClass(m.tone)}>{m.scoreLabel}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-          {report && report.days.length > 0 && (
-            <div className="nm-report-adherence">
-              <span>Aderenza periodo</span>
-              <span>{report.adherencePct}%</span>
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            ))}
+            {report && report.days.length > 0 && (
+              <div className="nm-report-adherence">
+                <span>Aderenza periodo</span>
+                <span>{report.adherencePct}%</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="nm-report-actions">
