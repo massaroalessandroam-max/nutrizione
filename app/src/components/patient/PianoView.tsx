@@ -135,6 +135,18 @@ export function PianoView({ patientName }: Props) {
     });
   };
 
+  // Scelta diretta (dropdown con tutte le opzioni della categoria), invece
+  // di dover ricliccare il dado finché non esce quella che si vuole.
+  const selectSlotItem = (meal: MealKey, i: number, name: string) => {
+    setDraft((d) => {
+      const slots = d[meal] ?? [];
+      const current = slots[i];
+      if (!current) return d;
+      const chosen = poolFor(current.category).find((p) => p.name === name) ?? null;
+      return { ...d, [meal]: slots.map((s, idx) => (idx === i ? { ...s, item: chosen } : s)) };
+    });
+  };
+
   const removeSlot = (meal: MealKey, i: number) =>
     setDraft((d) => ({ ...d, [meal]: (d[meal] ?? []).filter((_, idx) => idx !== i) }));
 
@@ -336,18 +348,29 @@ export function PianoView({ patientName }: Props) {
                       </div>
                     )}
 
-                    {slots.map((slot, i) => (
+                    {slots.map((slot, i) => {
+                      const pool = poolFor(slot.category);
+                      return (
                       <div key={i} className="nm-chef-slot">
                         <div className="nm-chef-slot-info">
                           <span className="nm-chef-slot-cat">{slot.category}</span>
-                          {slot.item ? (
-                            <span className="nm-chef-slot-name">{slot.item.name}{slot.item.quantity ? ` · ${slot.item.quantity}` : ''}</span>
+                          {pool.length > 0 ? (
+                            <select
+                              className="nm-text-input"
+                              style={{ marginTop: 2, padding: '6px 8px', fontSize: 13.5 }}
+                              value={slot.item?.name ?? ''}
+                              onChange={(e) => selectSlotItem(meal, i, e.target.value)}
+                            >
+                              {pool.map((p) => (
+                                <option key={p.name} value={p.name}>{p.name}{p.quantity ? ` · ${p.quantity}` : ''}</option>
+                              ))}
+                            </select>
                           ) : (
                             <span className="nm-chef-slot-empty">Niente nel piano per questa categoria</span>
                           )}
                         </div>
-                        {slot.item && poolFor(slot.category).length > 1 && (
-                          <button className="nm-plan-row-icon-btn" onClick={() => swapSlot(meal, i)} aria-label={`Cambia ${slot.category.toLowerCase()}`}>
+                        {pool.length > 1 && (
+                          <button className="nm-plan-row-icon-btn" onClick={() => swapSlot(meal, i)} aria-label={`Alimento casuale per ${slot.category.toLowerCase()}`}>
                             <RefreshIcon size={15} />
                           </button>
                         )}
@@ -355,7 +378,8 @@ export function PianoView({ patientName }: Props) {
                           <TrashIcon size={14} />
                         </button>
                       </div>
-                    ))}
+                      );
+                    })}
 
                     {addPickerOpen[meal] ? (
                       availableCats.length > 0 ? (
