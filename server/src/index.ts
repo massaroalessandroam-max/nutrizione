@@ -4,7 +4,6 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stateRouter } from './routes/state.js';
-import { patientsRouter } from './routes/patients.js';
 import { onboardingRouter } from './routes/onboarding.js';
 import { planRouter } from './routes/plan.js';
 import { mealPhotoRouter } from './routes/mealPhoto.js';
@@ -12,6 +11,10 @@ import { reportRouter } from './routes/report.js';
 import { supplementsRouter } from './routes/supplements.js';
 import { chefRouter } from './routes/chef.js';
 import { habitsRouter } from './routes/habits.js';
+import { messagesRouter } from './routes/messages.js';
+import { patientAuthRouter } from './routes/patientAuth.js';
+import { nutritionistAuthRouter } from './routes/nutritionistAuth.js';
+import { nutritionistRouter } from './routes/nutritionist.js';
 import { initDb, isRemoteDb } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,8 +26,20 @@ const PORT = Number(process.env.PORT ?? 4001);
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 
+// Login (nessuna autenticazione richiesta per accedervi).
+app.use('/api', patientAuthRouter);
+app.use('/api', nutritionistAuthRouter);
+
+// Dashboard nutrizionista — prefisso dedicato e montata PRIMA dei router
+// paziente qui sotto: tutti loro applicano requirePatient in blocco con
+// `.use()` senza percorso, quindi intercetterebbero (rifiutandole) anche le
+// richieste verso /api/nutritionist/* se questa venisse dopo nella catena —
+// un middleware senza percorso scatta per qualunque richiesta che raggiunge
+// quel router, non solo per le sue rotte definite.
+app.use('/api/nutritionist', nutritionistRouter);
+
+// Lato paziente — ogni router applica requirePatient al suo interno.
 app.use('/api', stateRouter);
-app.use('/api', patientsRouter);
 app.use('/api', onboardingRouter);
 app.use('/api', planRouter);
 app.use('/api', mealPhotoRouter);
@@ -32,6 +47,7 @@ app.use('/api', reportRouter);
 app.use('/api', supplementsRouter);
 app.use('/api', chefRouter);
 app.use('/api', habitsRouter);
+app.use('/api', messagesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb() }));
 

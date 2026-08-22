@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { ANTHROPIC_API_KEY, MAX_BASE64_LEN, callClaudeWithFile, extractJsonObject } from '../anthropic.js';
 import { ORDER as MEAL_ORDER, isMealKey, type MealKey } from '../constants.js';
+import { requirePatient } from '../auth.js';
 
 export const planRouter = Router();
+planRouter.use(requirePatient);
 
 // Macro-categorie fisse per raggruppare gli alimenti del piano, e opzioni
 // per il tetto settimanale concordato col nutrizionista. Frutta e Verdura
@@ -55,10 +57,16 @@ function cleanMealExamples(input: unknown): Record<MealKey, string[]> {
   return out;
 }
 
-interface PlanNotes { generalRules: string[]; mealExamples: Record<MealKey, string[]>; divieti: string[] }
+export interface PlanItem { name: string; quantity: string; category: string; maxPerWeek: string }
+export interface PlanNotes { generalRules: string[]; mealExamples: Record<MealKey, string[]>; divieti: string[] }
 
-async function loadPlanNotes(): Promise<PlanNotes> {
-  const { rows } = await db.execute('SELECT general_rules, meal_examples, divieti FROM plan_notes WHERE id = 1');
+export async function loadPlanItems(patientId: number): Promise<PlanItem[]> {
+  const { rows } = await db.execute({ sql: 'SELECT name, quantity, category, max_per_week FROM nutrition_plan_items WHERE patient_id = ? ORDER BY idx', args: [patientId] });
+  return (rows as any[]).map((r) => ({ name: r.name, quantity: r.quantity, category: r.category, maxPerWeek: r.max_per_week }));
+}
+
+export async function loadPlanNotes(patientId: number): Promise<PlanNotes> {
+  const { rows } = await db.execute({ sql: 'SELECT general_rules, meal_examples, divieti FROM plan_notes WHERE patient_id = ?', args: [patientId] });
   const row = rows[0] as any;
   if (!row) return { generalRules: [], mealExamples: cleanMealExamples({}), divieti: [] };
   return {
@@ -68,16 +76,16 @@ async function loadPlanNotes(): Promise<PlanNotes> {
   };
 }
 
-async function savePlanNotes(notes: PlanNotes): Promise<void> {
+async function savePlanNotes(patientId: number, notes: PlanNotes): Promise<void> {
   await db.execute({
-    sql: `INSERT INTO plan_notes (id, general_rules, meal_examples, divieti) VALUES (1, ?, ?, ?)
-          ON CONFLICT (id) DO UPDATE SET general_rules = excluded.general_rules, meal_examples = excluded.meal_examples, divieti = excluded.divieti`,
-    args: [JSON.stringify(notes.generalRules), JSON.stringify(notes.mealExamples), JSON.stringify(notes.divieti)],
+    sql: `INSERT INTO plan_notes (patient_id, general_rules, meal_examples, divieti) VALUES (?, ?, ?, ?)
+          ON CONFLICT (patient_id) DO UPDATE SET general_rules = excluded.general_rules, meal_examples = excluded.meal_examples, divieti = excluded.divieti`,
+    args: [patientId, JSON.stringify(notes.generalRules), JSON.stringify(notes.mealExamples), JSON.stringify(notes.divieti)],
   });
 }
 
-planRouter.get('/plan/notes', async (_req, res) => {
-  res.json(await loadPlanNotes());
+planRouter.get('/plan/notes', async (req, res) => {
+  res.json(await loadPlanNotes(req.patientId!));
 });
 
 planRouter.post('/plan/notes', async (req, res) => {
@@ -86,23 +94,23 @@ planRouter.post('/plan/notes', async (req, res) => {
     mealExamples: cleanMealExamples(req.body?.mealExamples),
     divieti: cleanStringList(req.body?.divieti),
   };
-  await savePlanNotes(notes);
+  await savePlanNotes(req.patientId!, notes);
   res.json(notes);
 });
 
-planRouter.get('/plan', async (_req, res) => {
-  const { rows } = await db.execute('SELECT name, quantity, category, max_per_week FROM nutrition_plan_items ORDER BY idx');
-  res.json((rows as any[]).map((r) => ({ name: r.name, quantity: r.quantity, category: r.category, maxPerWeek: r.max_per_week })));
+planRouter.get('/plan', async (req, res) => {
+  res.json(await loadPlanItems(req.patientId!));
 });
 
 planRouter.post('/plan', async (req, res) => {
+  const patientId = req.patientId!;
   const items = cleanItems(req.body?.items);
 
-  await db.execute('DELETE FROM nutrition_plan_items');
+  await db.execute({ sql: 'DELETE FROM nutrition_plan_items WHERE patient_id = ?', args: [patientId] });
   for (const [idx, it] of items.entries()) {
     await db.execute({
-      sql: 'INSERT INTO nutrition_plan_items (idx, name, quantity, category, max_per_week) VALUES (?, ?, ?, ?, ?)',
-      args: [idx, it.name, it.quantity, it.category, it.maxPerWeek],
+      sql: 'INSERT INTO nutrition_plan_items (patient_id, idx, name, quantity, category, max_per_week) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [patientId, idx, it.name, it.quantity, it.category, it.maxPerWeek],
     });
   }
 
@@ -148,8 +156,8 @@ planRouter.post('/plan/extract', async (req, res) => {
     const parsed = extractJsonObject(text) as Record<string, unknown>;
 
     await db.execute({
-      sql: 'INSERT INTO plan_uploads (filename, media_type, data_base64, uploaded_at) VALUES (?, ?, ?, ?)',
-      args: [typeof filename === 'string' && filename ? filename : 'piano', mediaType, fileBase64, new Date().toISOString()],
+      sql: 'INSERT INTO plan_uploads (patient_id, filename, media_type, data_base64, uploaded_at) VALUES (?, ?, ?, ?, ?)',
+      args: [req.patientId!, typeof filename === 'string' && filename ? filename : 'piano', mediaType, fileBase64, new Date().toISOString()],
     });
 
     res.json({
@@ -168,13 +176,13 @@ planRouter.post('/plan/extract', async (req, res) => {
 });
 
 // Log dei documenti piano caricati in passato (senza il contenuto, pesante).
-planRouter.get('/plan/uploads', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, filename, media_type, uploaded_at FROM plan_uploads ORDER BY id DESC');
+planRouter.get('/plan/uploads', async (req, res) => {
+  const { rows } = await db.execute({ sql: 'SELECT id, filename, media_type, uploaded_at FROM plan_uploads WHERE patient_id = ? ORDER BY id DESC', args: [req.patientId!] });
   res.json((rows as any[]).map((r) => ({ id: r.id, filename: r.filename, mediaType: r.media_type, uploadedAt: r.uploaded_at })));
 });
 
 planRouter.get('/plan/uploads/:id/download', async (req, res) => {
-  const { rows } = await db.execute({ sql: 'SELECT filename, media_type, data_base64 FROM plan_uploads WHERE id = ?', args: [req.params.id] });
+  const { rows } = await db.execute({ sql: 'SELECT filename, media_type, data_base64 FROM plan_uploads WHERE id = ? AND patient_id = ?', args: [req.params.id, req.patientId!] });
   const row = rows[0] as any;
   if (!row) return res.status(404).json({ error: 'file non trovato' });
 

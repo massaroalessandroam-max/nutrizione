@@ -7,6 +7,7 @@ import { AbitudiniView } from './components/patient/AbitudiniView';
 import { PremiView } from './components/patient/PremiView';
 import { PianoView } from './components/patient/PianoView';
 import { ReportView } from './components/patient/ReportView';
+import { MessaggiView } from './components/patient/MessaggiView';
 import { LogSheet } from './components/sheet/LogSheet';
 import { SummaryOverlay } from './components/sheet/SummaryOverlay';
 import { SupplementSheet } from './components/sheet/SupplementSheet';
@@ -48,6 +49,7 @@ function App() {
               {d.tab === 'premi' && <PremiView state={d.appState} onDayClick={d.openBackfill} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
               {d.tab === 'report' && <ReportView state={d.appState} onSetFreq={d.setFreq} />}
+              {d.tab === 'messaggi' && <MessaggiView />}
             </>
           )}
           {d.appState?.onboarded && <BottomNav tab={d.tab} onChange={d.setTab} />}

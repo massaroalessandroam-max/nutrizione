@@ -60,6 +60,16 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
         </div>
       </div>
 
+      {state.nextVisitAt && (
+        <div className="nm-fast-mini" style={{ marginBottom: 14 }}>
+          <ClockIcon size={15} color="var(--teal-700)" />
+          <div className="nm-fast-mini-body">
+            <div className="nm-fast-mini-title">Prossima visita</div>
+            <div className="nm-fast-mini-sub">{formatDateLabel(state.nextVisitAt)}{state.nextVisitNote ? ` · ${state.nextVisitNote}` : ''}</div>
+          </div>
+        </div>
+      )}
+
       <div className="nm-ring-card">
         <div className="nm-ring-top">
           <RingSvg size={112} radius={48} strokeWidth={10} progress={shownCount / activeCount} trackColor="rgba(255,255,255,.22)" progressColor="var(--gold)">

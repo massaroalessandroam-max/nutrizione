@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { buildState, DEFAULT_MEAL_TIME, FIXED_SCHEDULE_MEALS } from './state.js';
+import { requirePatient } from '../auth.js';
 
 export const onboardingRouter = Router();
+onboardingRouter.use(requirePatient);
 
 onboardingRouter.post('/onboarding', async (req, res) => {
+  const patientId = req.patientId!;
   const name = String(req.body?.name ?? '').trim();
   if (!name) return res.status(400).json({ error: 'name required' });
 
@@ -14,18 +17,18 @@ onboardingRouter.post('/onboarding', async (req, res) => {
     const enabled = entry.enabled !== false;
     const time = typeof entry.time === 'string' && entry.time ? entry.time : DEFAULT_MEAL_TIME[key];
     await db.execute({
-      sql: `INSERT INTO meal_schedule (meal_key, enabled, time) VALUES (?, ?, ?)
-            ON CONFLICT(meal_key) DO UPDATE SET enabled = excluded.enabled, time = excluded.time`,
-      args: [key, enabled ? 1 : 0, time],
+      sql: `INSERT INTO meal_schedule (patient_id, meal_key, enabled, time) VALUES (?, ?, ?, ?)
+            ON CONFLICT(patient_id, meal_key) DO UPDATE SET enabled = excluded.enabled, time = excluded.time`,
+      args: [patientId, key, enabled ? 1 : 0, time],
     });
   }
 
   const snacks: string[] = Array.isArray(req.body?.snacks)
     ? req.body.snacks.map((t: unknown) => String(t).trim()).filter(Boolean)
     : [];
-  await db.execute('DELETE FROM snack_schedule');
+  await db.execute({ sql: 'DELETE FROM snack_schedule WHERE patient_id = ?', args: [patientId] });
   for (const [idx, time] of snacks.entries()) {
-    await db.execute({ sql: 'INSERT INTO snack_schedule (idx, time) VALUES (?, ?)', args: [idx, time] });
+    await db.execute({ sql: 'INSERT INTO snack_schedule (patient_id, idx, time) VALUES (?, ?, ?)', args: [patientId, idx, time] });
   }
 
   const fasting = req.body?.fasting ?? {};
@@ -37,9 +40,9 @@ onboardingRouter.post('/onboarding', async (req, res) => {
     sql: `UPDATE app_state
           SET greeting_name = ?, onboarded = 1,
               fast_pref_enabled = ?, fast_pref_start = ?, fast_pref_end = ?
-          WHERE id = 1`,
-    args: [name, fastingEnabled ? 1 : 0, fastingStart, fastingEnd],
+          WHERE patient_id = ?`,
+    args: [name, fastingEnabled ? 1 : 0, fastingStart, fastingEnd, patientId],
   });
 
-  res.json(await buildState());
+  res.json(await buildState(patientId));
 });

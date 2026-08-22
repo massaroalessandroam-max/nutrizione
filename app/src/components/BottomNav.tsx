@@ -7,6 +7,7 @@ const NAV_ITEMS: Array<{ key: Tab; label: string }> = [
   { key: 'premi', label: 'Andamento' },
   { key: 'piano', label: 'Piano' },
   { key: 'report', label: 'Report' },
+  { key: 'messaggi', label: 'Messaggi' },
 ];
 
 export function BottomNav({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {

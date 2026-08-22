@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { fileToBase64 } from '../lib/file';
-import type { AppState, DayMealState, FastingPref, LogSummary, MealKey, Schedule, PatientDetail, PatientListItem } from '../types';
+import type { AppState, DayMealState, FastingPref, LogSummary, MealKey, Schedule } from '../types';
 import { MEAL_ORDER } from '../types';
 
-export type Role = 'paziente' | 'nutrizionista';
-export type Tab = 'diario' | 'abitudini' | 'premi' | 'piano' | 'report';
+export type Tab = 'diario' | 'abitudini' | 'premi' | 'piano' | 'report' | 'messaggi';
 export type LogMode = 'text' | 'audio' | 'photo';
 
 export function useDiario() {
-  const [role, setRole] = useState<Role>('paziente');
   const [tab, setTab] = useState<Tab>('diario');
 
   const [appState, setAppState] = useState<AppState | null>(null);
@@ -39,10 +37,6 @@ export function useDiario() {
   const openSupplementSheet = useCallback(() => setSupplementSheetOpen(true), []);
   const closeSupplementSheet = useCallback(() => setSupplementSheetOpen(false), []);
 
-  const [patients, setPatients] = useState<PatientListItem[] | null>(null);
-  const [activePatientId, setActivePatientId] = useState<string | null>(null);
-  const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
-
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     clearTimeout(toastTimer.current);
@@ -58,19 +52,6 @@ export function useDiario() {
   useEffect(() => {
     refreshState().finally(() => setLoading(false));
   }, [refreshState]);
-
-  useEffect(() => {
-    if (role !== 'nutrizionista' || activePatientId) return;
-    api.getPatients().then(setPatients).catch(() => setPatients([]));
-  }, [role, activePatientId]);
-
-  useEffect(() => {
-    if (!activePatientId) {
-      setActivePatient(null);
-      return;
-    }
-    api.getPatient(activePatientId).then(setActivePatient).catch(() => setActivePatient(null));
-  }, [activePatientId]);
 
   // key: locked di default (tap su un pasto specifico dal Diario) -> nel
   // sheet non si può cambiare pasto. Il testo/foto parte sempre vuoto: ogni
@@ -221,16 +202,8 @@ export function useDiario() {
     setAppState(s);
   }, []);
 
-  const selectPatient = useCallback((id: string) => setActivePatientId(id), []);
-  const backToList = useCallback(() => setActivePatientId(null), []);
-
-  const changeRole = useCallback((r: Role) => {
-    setRole(r);
-    if (r === 'nutrizionista') setActivePatientId(null);
-  }, []);
-
   return {
-    role, changeRole, tab, setTab,
+    tab, setTab,
     appState, loading, refreshState,
     sheetOpen, openSheet, openLogQuick, openBackfill, closeSheet,
     backfillDate, backfillMeals,
@@ -248,7 +221,6 @@ export function useDiario() {
     skipMeal,
     toggleFast, fastToggling, setFreq,
     supplementSheetOpen, openSupplementSheet, closeSupplementSheet,
-    patients, activePatientId, activePatient, selectPatient, backToList,
   };
 }
 

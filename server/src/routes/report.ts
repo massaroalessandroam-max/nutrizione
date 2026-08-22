@@ -4,16 +4,18 @@ import { LABEL, type MealKey } from '../constants.js';
 import { score, verdict, foodMatches } from '../match.js';
 import { ANTHROPIC_API_KEY, callClaudeText, extractJsonArray } from '../anthropic.js';
 import { PLAN_CATEGORIES } from './plan.js';
+import { requirePatient } from '../auth.js';
 
 export const reportRouter = Router();
+reportRouter.use(requirePatient);
 
-async function loadPlanItemsWithCategory(): Promise<Array<{ name: string; category: string }>> {
-  const { rows } = await db.execute('SELECT name, category FROM nutrition_plan_items');
+async function loadPlanItemsWithCategory(patientId: number): Promise<Array<{ name: string; category: string }>> {
+  const { rows } = await db.execute({ sql: 'SELECT name, category FROM nutrition_plan_items WHERE patient_id = ?', args: [patientId] });
   return (rows as any[]).map((r) => ({ name: r.name as string, category: (r.category as string) || 'Altro' }));
 }
 
-async function loadDivieti(): Promise<string[]> {
-  const { rows } = await db.execute('SELECT divieti FROM plan_notes WHERE id = 1');
+async function loadDivieti(patientId: number): Promise<string[]> {
+  const { rows } = await db.execute({ sql: 'SELECT divieti FROM plan_notes WHERE patient_id = ?', args: [patientId] });
   const row = rows[0] as any;
   return row ? JSON.parse(row.divieti) : [];
 }
@@ -24,10 +26,10 @@ function shiftDate(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function loadFoodEntriesInRange(from: string, to: string): Promise<Array<{ date: string; food: string }>> {
+async function loadFoodEntriesInRange(patientId: number, from: string, to: string): Promise<Array<{ date: string; food: string }>> {
   const { rows } = await db.execute({
-    sql: 'SELECT date, foods FROM meals WHERE done = 1 AND date >= ? AND date <= ?',
-    args: [from, to],
+    sql: 'SELECT date, foods FROM meals WHERE patient_id = ? AND done = 1 AND date >= ? AND date <= ?',
+    args: [patientId, from, to],
   });
   const entries: Array<{ date: string; food: string }> = [];
   for (const r of rows as any[]) {
@@ -38,6 +40,8 @@ async function loadFoodEntriesInRange(from: string, to: string): Promise<Array<{
 
 type Weights = Record<string, number>;
 
+// Cache generica (non è dato di un paziente specifico: la classificazione
+// di "pasta al pomodoro" è la stessa per chiunque), nessuno scoping.
 async function loadCachedWeights(foodKeys: string[]): Promise<Map<string, Weights>> {
   if (!foodKeys.length) return new Map();
   const placeholders = foodKeys.map(() => '?').join(',');
@@ -121,34 +125,14 @@ async function categorizeFoodsWeighted(
   return result;
 }
 
-// Date (YYYY-MM-DD) del mese dato con almeno un pasto registrato — per
-// colorare il calendario senza scaricare tutti i pasti.
-reportRouter.get('/report/activity', async (req, res) => {
-  const month = String(req.query.month ?? '');
-  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'mese non valido' });
-
+// Estratte come funzioni esportate: usate sia dalla route paziente (patientId
+// dal token) sia dalla dashboard nutrizionista (patientId dall'URL).
+export async function buildReport(patientId: number, from: string, to: string) {
   const { rows } = await db.execute({
-    sql: 'SELECT DISTINCT date FROM meals WHERE done = 1 AND date LIKE ?',
-    args: [`${month}-%`],
+    sql: 'SELECT date, meal_key, foods, time FROM meals WHERE patient_id = ? AND done = 1 AND date >= ? AND date <= ? ORDER BY date, meal_key',
+    args: [patientId, from, to],
   });
-  res.json((rows as any[]).map((r) => r.date as string));
-});
-
-// Report su un intervallo di date (una o più settimane, un mese, un anno):
-// tutti i pasti fatti raggruppati per giorno, con verdetto e aderenza
-// aggregata sull'intero periodo.
-reportRouter.get('/report', async (req, res) => {
-  const from = String(req.query.from ?? '');
-  const to = String(req.query.to ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-    return res.status(400).json({ error: 'intervallo non valido' });
-  }
-
-  const { rows } = await db.execute({
-    sql: 'SELECT date, meal_key, foods, time FROM meals WHERE done = 1 AND date >= ? AND date <= ? ORDER BY date, meal_key',
-    args: [from, to],
-  });
-  const planItems = await loadPlanItemsWithCategory();
+  const planItems = await loadPlanItemsWithCategory(patientId);
   const planFoods = planItems.map((p) => p.name);
   // 'Altro' è il fallback del loader per categoria non specificata: non è
   // una vera macro-categoria condivisa, va escluso altrimenti alimenti
@@ -156,7 +140,7 @@ reportRouter.get('/report', async (req, res) => {
   const planCategories = Object.fromEntries(
     planItems.filter((p) => p.category && p.category !== 'Altro').map((p) => [p.name.toLowerCase(), p.category])
   );
-  const divieti = await loadDivieti();
+  const divieti = await loadDivieti(patientId);
 
   const byDate = new Map<string, any[]>();
   for (const r of rows as any[]) {
@@ -188,28 +172,18 @@ reportRouter.get('/report', async (req, res) => {
 
   const adherencePct = totalFoods > 0 ? Math.round((goodFoods / totalFoods) * 100) : 0;
 
-  res.json({ from, to, days, totalMeals, adherencePct });
-});
+  return { from, to, days, totalMeals, adherencePct };
+}
 
-// Ripartizione per categoria (macronutrienti) degli alimenti registrati nel
-// periodo scelto, a confronto con lo stesso numero di giorni immediatamente
-// precedente (es. "oggi" -> ieri; una settimana -> la settimana prima) — con
-// il dettaglio di quali alimenti/giorni compongono ogni percentuale.
-reportRouter.get('/report/macros', async (req, res) => {
-  const from = String(req.query.from ?? '');
-  const to = String(req.query.to ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-    return res.status(400).json({ error: 'intervallo non valido' });
-  }
-
+export async function buildMacros(patientId: number, from: string, to: string) {
   const spanDays = Math.round((new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86_400_000) + 1;
   const prevTo = shiftDate(from, -1);
   const prevFrom = shiftDate(prevTo, -(spanDays - 1));
 
-  const planItems = await loadPlanItemsWithCategory();
+  const planItems = await loadPlanItemsWithCategory(patientId);
   const [currentEntries, previousEntries] = await Promise.all([
-    loadFoodEntriesInRange(from, to),
-    loadFoodEntriesInRange(prevFrom, prevTo),
+    loadFoodEntriesInRange(patientId, from, to),
+    loadFoodEntriesInRange(patientId, prevFrom, prevTo),
   ]);
 
   const weightsMap = await categorizeFoodsWeighted(
@@ -235,15 +209,53 @@ reportRouter.get('/report/macros', async (req, res) => {
     return { total: entries.length, categories };
   }
 
-  res.json({
+  return {
     current: { from, to, ...buildPeriod(currentEntries) },
     previous: { from: prevFrom, to: prevTo, ...buildPeriod(previousEntries) },
+  };
+}
+
+// Date (YYYY-MM-DD) del mese dato con almeno un pasto registrato — per
+// colorare il calendario senza scaricare tutti i pasti.
+reportRouter.get('/report/activity', async (req, res) => {
+  const month = String(req.query.month ?? '');
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'mese non valido' });
+
+  const { rows } = await db.execute({
+    sql: 'SELECT DISTINCT date FROM meals WHERE patient_id = ? AND done = 1 AND date LIKE ?',
+    args: [req.patientId!, `${month}-%`],
   });
+  res.json((rows as any[]).map((r) => r.date as string));
+});
+
+// Report su un intervallo di date (una o più settimane, un mese, un anno):
+// tutti i pasti fatti raggruppati per giorno, con verdetto e aderenza
+// aggregata sull'intero periodo.
+reportRouter.get('/report', async (req, res) => {
+  const from = String(req.query.from ?? '');
+  const to = String(req.query.to ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'intervallo non valido' });
+  }
+  res.json(await buildReport(req.patientId!, from, to));
+});
+
+// Ripartizione per categoria (macronutrienti) degli alimenti registrati nel
+// periodo scelto, a confronto con lo stesso numero di giorni immediatamente
+// precedente (es. "oggi" -> ieri; una settimana -> la settimana prima) — con
+// il dettaglio di quali alimenti/giorni compongono ogni percentuale.
+reportRouter.get('/report/macros', async (req, res) => {
+  const from = String(req.query.from ?? '');
+  const to = String(req.query.to ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'intervallo non valido' });
+  }
+  res.json(await buildMacros(req.patientId!, from, to));
 });
 
 // Destinatari email del report, con alias (es. "Dott.ssa Rossi").
-reportRouter.get('/report/recipients', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, email, alias FROM report_recipients ORDER BY id');
+reportRouter.get('/report/recipients', async (req, res) => {
+  const { rows } = await db.execute({ sql: 'SELECT id, email, alias FROM report_recipients WHERE patient_id = ? ORDER BY id', args: [req.patientId!] });
   res.json((rows as any[]).map((r) => ({ id: r.id, email: r.email, alias: r.alias })));
 });
 
@@ -253,22 +265,22 @@ reportRouter.post('/report/recipients', async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'email non valida' });
   }
-  await db.execute({ sql: 'INSERT INTO report_recipients (email, alias) VALUES (?, ?)', args: [email, alias] });
-  const { rows } = await db.execute('SELECT id, email, alias FROM report_recipients ORDER BY id');
+  await db.execute({ sql: 'INSERT INTO report_recipients (patient_id, email, alias) VALUES (?, ?, ?)', args: [req.patientId!, email, alias] });
+  const { rows } = await db.execute({ sql: 'SELECT id, email, alias FROM report_recipients WHERE patient_id = ? ORDER BY id', args: [req.patientId!] });
   res.json((rows as any[]).map((r) => ({ id: r.id, email: r.email, alias: r.alias })));
 });
 
 reportRouter.delete('/report/recipients/:id', async (req, res) => {
-  await db.execute({ sql: 'DELETE FROM report_recipients WHERE id = ?', args: [req.params.id] });
-  const { rows } = await db.execute('SELECT id, email, alias FROM report_recipients ORDER BY id');
+  await db.execute({ sql: 'DELETE FROM report_recipients WHERE id = ? AND patient_id = ?', args: [req.params.id, req.patientId!] });
+  const { rows } = await db.execute({ sql: 'SELECT id, email, alias FROM report_recipients WHERE patient_id = ? ORDER BY id', args: [req.patientId!] });
   res.json((rows as any[]).map((r) => ({ id: r.id, email: r.email, alias: r.alias })));
 });
 
 // Storico invii — vuoto finché l'invio email automatico non è collegato a
 // un servizio reale (vedi commento in db.ts): le righe si popoleranno da
 // sole quando quella parte sarà attiva.
-reportRouter.get('/report/history', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, sent_at, recipients, report_from, report_to FROM report_send_log ORDER BY id DESC');
+reportRouter.get('/report/history', async (req, res) => {
+  const { rows } = await db.execute({ sql: 'SELECT id, sent_at, recipients, report_from, report_to FROM report_send_log WHERE patient_id = ? ORDER BY id DESC', args: [req.patientId!] });
   res.json((rows as any[]).map((r) => ({
     id: r.id, sentAt: r.sent_at, recipients: JSON.parse(r.recipients), from: r.report_from, to: r.report_to,
   })));
@@ -276,8 +288,8 @@ reportRouter.get('/report/history', async (_req, res) => {
 
 reportRouter.get('/report/history/:id', async (req, res) => {
   const { rows } = await db.execute({
-    sql: 'SELECT id, sent_at, recipients, report_from, report_to, body_text FROM report_send_log WHERE id = ?',
-    args: [req.params.id],
+    sql: 'SELECT id, sent_at, recipients, report_from, report_to, body_text FROM report_send_log WHERE id = ? AND patient_id = ?',
+    args: [req.params.id, req.patientId!],
   });
   const row = rows[0] as any;
   if (!row) return res.status(404).json({ error: 'invio non trovato' });

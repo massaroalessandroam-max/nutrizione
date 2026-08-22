@@ -4,8 +4,10 @@ import { ORDER, LABEL, isMealKey, type MealKey } from '../constants.js';
 import { score, verdict, verdictOf, pointsForFoods, foodMatches, type MatchContext } from '../match.js';
 import { computeStreak, computeWeek, computeBadges } from '../stats.js';
 import { romeParts, todayStr } from '../time.js';
+import { requirePatient } from '../auth.js';
 
 export const stateRouter = Router();
+stateRouter.use(requirePatient);
 
 // Colazione/pranzo/cena hanno un solo orario abituale ciascuno; gli
 // spuntini possono essere più d'uno, quindi vivono in una lista a parte
@@ -17,8 +19,8 @@ export const DEFAULT_MEAL_TIME: Record<FixedScheduleMeal, string> = {
   colazione: '08:00', pranzo: '13:00', cena: '20:00',
 };
 
-export async function loadSchedule() {
-  const { rows } = await db.execute('SELECT meal_key, enabled, time FROM meal_schedule');
+export async function loadSchedule(patientId: number) {
+  const { rows } = await db.execute({ sql: 'SELECT meal_key, enabled, time FROM meal_schedule WHERE patient_id = ?', args: [patientId] });
   const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
   const meals: Record<FixedScheduleMeal, { enabled: boolean; time: string }> = {} as any;
   for (const key of FIXED_SCHEDULE_MEALS) {
@@ -28,7 +30,7 @@ export async function loadSchedule() {
       : { enabled: true, time: DEFAULT_MEAL_TIME[key] };
   }
 
-  const { rows: snackRows } = await db.execute('SELECT time FROM snack_schedule ORDER BY idx');
+  const { rows: snackRows } = await db.execute({ sql: 'SELECT time FROM snack_schedule WHERE patient_id = ? ORDER BY idx', args: [patientId] });
   const snacks = (snackRows as any[]).map((r) => r.time as string);
 
   return { ...meals, snacks };
@@ -37,10 +39,10 @@ export async function loadSchedule() {
 // Alimenti registrati (pasti fatti) negli ultimi 7 giorni fino a `date`
 // compreso — usato per verificare se un alimento del piano ha già raggiunto
 // il suo tetto settimanale.
-async function loadWeekFoods(date: string): Promise<string[]> {
+async function loadWeekFoods(patientId: number, date: string): Promise<string[]> {
   const { rows } = await db.execute({
-    sql: `SELECT foods FROM meals WHERE done = 1 AND date >= date(?, '-6 days') AND date <= ?`,
-    args: [date, date],
+    sql: `SELECT foods FROM meals WHERE patient_id = ? AND done = 1 AND date >= date(?, '-6 days') AND date <= ?`,
+    args: [patientId, date, date],
   });
   return (rows as any[]).flatMap((r) => JSON.parse(r.foods) as string[]);
 }
@@ -50,15 +52,15 @@ async function loadWeekFoods(date: string): Promise<string[]> {
 // Chi ha un tetto settimanale numerico ('1'/'2'/'3') e lo ha già raggiunto o
 // superato questa settimana finisce in overLimitPlanNames, così il match
 // engine lo segnala invece di darlo per "buono" a prescindere.
-async function loadMatchContext(date: string): Promise<MatchContext> {
-  const { rows } = await db.execute('SELECT name, category, max_per_week FROM nutrition_plan_items');
+async function loadMatchContext(patientId: number, date: string): Promise<MatchContext> {
+  const { rows } = await db.execute({ sql: 'SELECT name, category, max_per_week FROM nutrition_plan_items WHERE patient_id = ?', args: [patientId] });
   const planItems = (rows as any[]).map((r) => ({ name: r.name as string, category: r.category as string, maxPerWeek: r.max_per_week as string }));
   const planFoods = planItems.map((p) => p.name);
   const planCategories = Object.fromEntries(
     planItems.filter((p) => p.category).map((p) => [p.name.toLowerCase(), p.category])
   );
 
-  const weekFoods = await loadWeekFoods(date);
+  const weekFoods = await loadWeekFoods(patientId, date);
   const overLimitPlanNames = new Set<string>();
   for (const item of planItems) {
     const cap = Number(item.maxPerWeek);
@@ -67,15 +69,15 @@ async function loadMatchContext(date: string): Promise<MatchContext> {
     if (count > cap) overLimitPlanNames.add(item.name.toLowerCase());
   }
 
-  const divieti = await loadDivieti();
+  const divieti = await loadDivieti(patientId);
 
   return { planFoods, planCategories, overLimitPlanNames, divieti, month: new Date().getMonth() + 1 };
 }
 
 // Divieti espliciti del nutrizionista (allergie, intolleranze, controindicazioni),
 // caricati come il piano da PianoView: hanno priorità assoluta nel match engine.
-async function loadDivieti(): Promise<string[]> {
-  const { rows } = await db.execute('SELECT divieti FROM plan_notes WHERE id = 1');
+async function loadDivieti(patientId: number): Promise<string[]> {
+  const { rows } = await db.execute({ sql: 'SELECT divieti FROM plan_notes WHERE patient_id = ?', args: [patientId] });
   const row = rows[0] as any;
   return row ? JSON.parse(row.divieti) : [];
 }
@@ -102,10 +104,10 @@ function readFastingPref(appState: any) {
   };
 }
 
-async function loadMeals(date: string) {
+export async function loadMeals(patientId: number, date: string) {
   const { rows } = await db.execute({
-    sql: 'SELECT meal_key, done, foods, time, skipped, mood FROM meals WHERE date = ?',
-    args: [date],
+    sql: 'SELECT meal_key, done, foods, time, skipped, mood FROM meals WHERE patient_id = ? AND date = ?',
+    args: [patientId, date],
   });
   const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
   const meals: Record<MealKey, { done: boolean; foods: string[]; time: string; skipped: boolean; mood: number }> = {} as any;
@@ -127,13 +129,13 @@ export function resolveDate(input: unknown): string {
   return today;
 }
 
-export async function buildState() {
+export async function buildState(patientId: number) {
   const date = todayStr();
-  const { rows } = await db.execute('SELECT * FROM app_state WHERE id = 1');
+  const { rows } = await db.execute({ sql: 'SELECT * FROM app_state WHERE patient_id = ?', args: [patientId] });
   const appState = rows[0] as any;
-  const meals = await loadMeals(date);
-  const ctx = await loadMatchContext(date);
-  const schedule = await loadSchedule();
+  const meals = await loadMeals(patientId, date);
+  const ctx = await loadMatchContext(patientId, date);
+  const schedule = await loadSchedule(patientId);
   const activeMeals = computeActiveMeals(schedule);
   // Denominatore di oggi: pasti della routine non saltati OGGI, più
   // qualsiasi pasto extra registrato fuori routine (es. uno spuntino non
@@ -156,10 +158,14 @@ export async function buildState() {
     })
   );
 
-  const streak = await computeStreak(date);
+  const streak = await computeStreak(patientId, date);
+  const { rows: patientRows } = await db.execute({ sql: 'SELECT next_visit_at, next_visit_note FROM patients WHERE id = ?', args: [patientId] });
+  const patientRow = patientRows[0] as any;
 
   return {
     date,
+    nextVisitAt: patientRow?.next_visit_at ?? '',
+    nextVisitNote: patientRow?.next_visit_note ?? '',
     points: appState.points as number,
     streak,
     freq: appState.freq as string,
@@ -175,13 +181,13 @@ export async function buildState() {
     doneCount,
     adherencePct: adherence,
     meals: mealsOut,
-    week: await computeWeek(date),
-    badges: await computeBadges(streak),
+    week: await computeWeek(patientId, date),
+    badges: await computeBadges(patientId, streak),
   };
 }
 
-stateRouter.get('/state', async (_req, res) => {
-  res.json(await buildState());
+stateRouter.get('/state', async (req, res) => {
+  res.json(await buildState(req.patientId!));
 });
 
 // Pasti di un giorno precedente (non quello di oggi, già in /state) — usato
@@ -189,7 +195,7 @@ stateRouter.get('/state', async (_req, res) => {
 // un giorno nel grafico "Andamento".
 stateRouter.get('/meals', async (req, res) => {
   const date = resolveDate(req.query.date);
-  res.json(await loadMeals(date));
+  res.json(await loadMeals(req.patientId!, date));
 });
 
 stateRouter.put('/settings/freq', async (req, res) => {
@@ -197,8 +203,8 @@ stateRouter.put('/settings/freq', async (req, res) => {
   if (!['meal', 'multi', 'day', 'manual'].includes(freq)) {
     return res.status(400).json({ error: 'invalid freq' });
   }
-  await db.execute({ sql: 'UPDATE app_state SET freq = ? WHERE id = 1', args: [freq] });
-  res.json(await buildState());
+  await db.execute({ sql: 'UPDATE app_state SET freq = ? WHERE patient_id = ?', args: [freq, req.patientId] });
+  res.json(await buildState(req.patientId!));
 });
 
 stateRouter.put('/settings/report-time', async (req, res) => {
@@ -206,20 +212,20 @@ stateRouter.put('/settings/report-time', async (req, res) => {
   if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
     return res.status(400).json({ error: 'orario non valido' });
   }
-  await db.execute({ sql: 'UPDATE app_state SET report_send_time = ? WHERE id = 1', args: [time] });
-  res.json(await buildState());
+  await db.execute({ sql: 'UPDATE app_state SET report_send_time = ? WHERE patient_id = ?', args: [time, req.patientId!] });
+  res.json(await buildState(req.patientId!));
 });
 
-stateRouter.post('/fast/toggle', async (_req, res) => {
-  const { rows } = await db.execute('SELECT fast_active, fast_start FROM app_state WHERE id = 1');
+stateRouter.post('/fast/toggle', async (req, res) => {
+  const { rows } = await db.execute({ sql: 'SELECT fast_active, fast_start FROM app_state WHERE patient_id = ?', args: [req.patientId!] });
   const appState = rows[0] as any;
   const nowActive = !appState.fast_active;
   const fastStart = nowActive ? Date.now() : appState.fast_start;
   await db.execute({
-    sql: 'UPDATE app_state SET fast_active = ?, fast_start = ? WHERE id = 1',
-    args: [nowActive ? 1 : 0, fastStart],
+    sql: 'UPDATE app_state SET fast_active = ?, fast_start = ? WHERE patient_id = ?',
+    args: [nowActive ? 1 : 0, fastStart, req.patientId],
   });
-  res.json(await buildState());
+  res.json(await buildState(req.patientId!));
 });
 
 stateRouter.post('/meals/:key/log', async (req, res) => {
@@ -230,6 +236,7 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
     : [];
   if (!foods.length) return res.status(400).json({ error: 'no foods provided' });
 
+  const patientId = req.patientId!;
   // Se il client manda una data (backfill di un giorno precedente dal
   // grafico "Andamento") si registra su quella, non su oggi.
   const date = resolveDate(req.body?.date);
@@ -239,21 +246,21 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
   // yogurt alle 6, colazione completa con uova e pane alle 8): i nuovi
   // alimenti si aggiungono a quelli già registrati invece di sostituirli.
   const { rows: existingRows } = await db.execute({
-    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
-    args: [date, key],
+    sql: 'SELECT foods FROM meals WHERE patient_id = ? AND date = ? AND meal_key = ?',
+    args: [patientId, date, key],
   });
   const existingFoods: string[] = existingRows[0] ? JSON.parse((existingRows[0] as any).foods) : [];
   const mergedFoods = [...existingFoods, ...foods];
 
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 1, ?, ?, 0)
-          ON CONFLICT(date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time, skipped = 0`,
-    args: [date, key, JSON.stringify(mergedFoods), time],
+    sql: `INSERT INTO meals (patient_id, date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, 1, ?, ?, 0)
+          ON CONFLICT(patient_id, date, meal_key) DO UPDATE SET done = 1, foods = excluded.foods, time = excluded.time, skipped = 0`,
+    args: [patientId, date, key, JSON.stringify(mergedFoods), time],
   });
 
-  const ctx = await loadMatchContext(date);
+  const ctx = await loadMatchContext(patientId, date);
   const pts = pointsForFoods(foods, ctx);
-  await db.execute({ sql: 'UPDATE app_state SET points = points + ? WHERE id = 1', args: [pts] });
+  await db.execute({ sql: 'UPDATE app_state SET points = points + ? WHERE patient_id = ?', args: [pts, patientId] });
 
   const sc = score(foods, ctx);
   const summary = {
@@ -268,7 +275,7 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
     pointsEarned: pts,
   };
 
-  res.json({ state: await buildState(), summary });
+  res.json({ state: await buildState(patientId), summary });
 });
 
 // Sostituisce l'intero elenco di alimenti già registrati per il pasto oggi
@@ -282,66 +289,69 @@ stateRouter.put('/meals/:key/log', async (req, res) => {
     ? req.body.foods.map((f: unknown) => String(f).trim()).filter(Boolean)
     : [];
 
+  const patientId = req.patientId!;
   const date = resolveDate(req.body?.date);
   const { rows } = await db.execute({
-    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
-    args: [date, key],
+    sql: 'SELECT foods FROM meals WHERE patient_id = ? AND date = ? AND meal_key = ?',
+    args: [patientId, date, key],
   });
   const existingFoods: string[] = rows[0] ? JSON.parse((rows[0] as any).foods) : [];
 
-  const ctx = await loadMatchContext(date);
+  const ctx = await loadMatchContext(patientId, date);
   const oldPts = pointsForFoods(existingFoods, ctx);
   const newPts = pointsForFoods(foods, ctx);
-  await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ? + ?) WHERE id = 1', args: [oldPts, newPts] });
+  await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ? + ?) WHERE patient_id = ?', args: [oldPts, newPts, patientId] });
 
   const time = romeParts().time;
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, ?, ?, 0)
-          ON CONFLICT(date, meal_key) DO UPDATE SET done = excluded.done, foods = excluded.foods, time = excluded.time, skipped = 0`,
-    args: [date, key, foods.length ? 1 : 0, JSON.stringify(foods), foods.length ? time : ''],
+    sql: `INSERT INTO meals (patient_id, date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, ?, ?, ?, 0)
+          ON CONFLICT(patient_id, date, meal_key) DO UPDATE SET done = excluded.done, foods = excluded.foods, time = excluded.time, skipped = 0`,
+    args: [patientId, date, key, foods.length ? 1 : 0, JSON.stringify(foods), foods.length ? time : ''],
   });
 
-  res.json(await buildState());
+  res.json(await buildState(patientId));
 });
 
 stateRouter.delete('/meals/:key/log', async (req, res) => {
   const { key } = req.params;
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
 
+  const patientId = req.patientId!;
   const date = resolveDate(req.query.date);
   const { rows } = await db.execute({
-    sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
-    args: [date, key],
+    sql: 'SELECT foods FROM meals WHERE patient_id = ? AND date = ? AND meal_key = ?',
+    args: [patientId, date, key],
   });
   const row = rows[0] as any;
   if (row) {
     const foods: string[] = JSON.parse(row.foods);
-    const pts = pointsForFoods(foods, await loadMatchContext(date));
-    await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ?) WHERE id = 1', args: [pts] });
+    const pts = pointsForFoods(foods, await loadMatchContext(patientId, date));
+    await db.execute({ sql: 'UPDATE app_state SET points = MAX(0, points - ?) WHERE patient_id = ?', args: [pts, patientId] });
   }
 
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 0, '[]', '', 0)
-          ON CONFLICT(date, meal_key) DO UPDATE SET done = 0, foods = '[]', time = '', skipped = 0`,
-    args: [date, key],
+    sql: `INSERT INTO meals (patient_id, date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, 0, '[]', '', 0)
+          ON CONFLICT(patient_id, date, meal_key) DO UPDATE SET done = 0, foods = '[]', time = '', skipped = 0`,
+    args: [patientId, date, key],
   });
 
-  res.json(await buildState());
+  res.json(await buildState(patientId));
 });
 
 stateRouter.put('/meals/:key/skip', async (req, res) => {
   const { key } = req.params;
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
   const skipped = req.body?.skipped === true ? 1 : 0;
+  const patientId = req.patientId!;
   const date = todayStr();
 
   await db.execute({
-    sql: `INSERT INTO meals (date, meal_key, done, foods, time, skipped) VALUES (?, ?, 0, '[]', '', ?)
-          ON CONFLICT(date, meal_key) DO UPDATE SET skipped = excluded.skipped`,
-    args: [date, key, skipped],
+    sql: `INSERT INTO meals (patient_id, date, meal_key, done, foods, time, skipped) VALUES (?, ?, ?, 0, '[]', '', ?)
+          ON CONFLICT(patient_id, date, meal_key) DO UPDATE SET skipped = excluded.skipped`,
+    args: [patientId, date, key, skipped],
   });
 
-  res.json(await buildState());
+  res.json(await buildState(patientId));
 });
 
 // Valutazione dell'umore dopo il pasto (1-5), impostata con una chiamata a
@@ -352,9 +362,10 @@ stateRouter.put('/meals/:key/mood', async (req, res) => {
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
   const mood = Number(req.body?.mood);
   if (!Number.isInteger(mood) || mood < 1 || mood > 5) return res.status(400).json({ error: 'mood non valido (1-5)' });
+  const patientId = req.patientId!;
   const date = resolveDate(req.body?.date);
 
-  await db.execute({ sql: 'UPDATE meals SET mood = ? WHERE date = ? AND meal_key = ?', args: [mood, date, key] });
+  await db.execute({ sql: 'UPDATE meals SET mood = ? WHERE patient_id = ? AND date = ? AND meal_key = ?', args: [mood, patientId, date, key] });
 
-  res.json(await buildState());
+  res.json(await buildState(patientId));
 });

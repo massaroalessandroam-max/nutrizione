@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { ANTHROPIC_API_KEY, MAX_BASE64_LEN, callClaudeWithFile, extractJsonArray } from '../anthropic.js';
+import { requirePatient } from '../auth.js';
 
 export const mealPhotoRouter = Router();
+mealPhotoRouter.use(requirePatient);
 
 const MEAL_PHOTO_PROMPT = `Sei un assistente che riconosce gli alimenti in una foto di un pasto.
 Analizza la foto ed elenca gli alimenti visibili, con un nome breve in italiano (es. "Petto di pollo", "Insalata mista"), senza indicare quantità o grammature.

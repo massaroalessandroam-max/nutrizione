@@ -67,6 +67,9 @@ export interface FastingPref {
 
 export interface AppState {
   date: string;
+  // Prossima visita impostata dal nutrizionista, facoltativa — stringa vuota se non impostata.
+  nextVisitAt: string;
+  nextVisitNote: string;
   points: number;
   streak: number;
   freq: 'meal' | 'multi' | 'day' | 'manual';
@@ -130,33 +133,54 @@ export interface Habit {
   weekCount: number;
 }
 
-export interface PatientListItem {
-  id: string;
+export interface NutritionistPatientListItem {
+  id: number;
   name: string;
-  initials: string;
-  adherence: string;
-  tone: Tone;
-  last: string;
-  time: string;
-}
-
-export interface PatientLogMeal {
-  key: MealKey;
-  label: string;
-  time: string;
-  scoreLabel: string;
-  tone: Tone;
-  foods: FoodVerdict[];
-}
-
-export interface PatientDetail {
-  id: string;
-  name: string;
-  initials: string;
-  plan: string;
-  adherence: string;
-  tone: Tone;
+  onboarded: boolean;
+  adherencePct: number;
   streak: number;
-  mealsToday: number;
-  log: PatientLogMeal[];
+  points: number;
+  nextVisitAt: string;
+  nextVisitNote: string;
+}
+
+export interface NutritionistPatientDetail {
+  id: number;
+  name: string;
+  nextVisitAt: string;
+  nextVisitNote: string;
+  state: AppState;
+  habits: Habit[];
+  plan: { items: PlanItemLite[]; notes: PlanNotesLite };
+}
+
+// Copie leggere di PlanItem/PlanNotes (definiti in api.ts) per evitare un
+// giro di import circolare da types.ts — stessa forma.
+export interface PlanItemLite {
+  name: string;
+  quantity: string;
+  category: string;
+  maxPerWeek: string;
+}
+
+export interface PlanNotesLite {
+  generalRules: string[];
+  mealExamples: Record<MealKey, string[]>;
+  divieti: string[];
+}
+
+export interface NutritionistTeamMember {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+export type MessageSender = 'paziente' | 'nutrizionista';
+
+export interface Message {
+  id: number;
+  sender: MessageSender;
+  text: string;
+  createdAt: string;
 }

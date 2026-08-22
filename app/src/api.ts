@@ -1,18 +1,58 @@
-import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitFrequency } from './types';
+import type {
+  AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember,
+  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitFrequency,
+} from './types';
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
+const PATIENT_TOKEN_KEY = 'nm_patient_token';
+const NUTRITIONIST_TOKEN_KEY = 'nm_nutritionist_token';
+
+// Due sessioni indipendenti (paziente e nutrizionista) possono coesistere
+// in due schede diverse dello stesso browser — localStorage separato per
+// tipo, mai un token che si sovrascrive con l'altro.
+export const authStorage = {
+  getPatientToken: () => localStorage.getItem(PATIENT_TOKEN_KEY),
+  setPatientToken: (t: string) => localStorage.setItem(PATIENT_TOKEN_KEY, t),
+  clearPatientToken: () => localStorage.removeItem(PATIENT_TOKEN_KEY),
+  getNutritionistToken: () => localStorage.getItem(NUTRITIONIST_TOKEN_KEY),
+  setNutritionistToken: (t: string) => localStorage.setItem(NUTRITIONIST_TOKEN_KEY, t),
+  clearNutritionistToken: () => localStorage.removeItem(NUTRITIONIST_TOKEN_KEY),
+};
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+type AuthAs = 'patient' | 'nutritionist' | 'none';
+
+async function req<T>(path: string, init: RequestInit = {}, authAs: AuthAs = 'patient'): Promise<T> {
+  const token = authAs === 'patient' ? authStorage.getPatientToken() : authAs === 'nutritionist' ? authStorage.getNutritionistToken() : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`/api${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(res.status, body.error ?? `Request failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
 
+const nutriReq = <T>(path: string, init?: RequestInit) => req<T>(path, init, 'nutritionist');
+
 export const api = {
+  // ===== Autenticazione =====
+  patientLogin: (code: string) => req<{ token: string; patientId: number }>('/patient-auth/login', { method: 'POST', body: JSON.stringify({ code }) }, 'none'),
+  nutritionistLogin: (email: string, password: string) =>
+    req<{ token: string }>('/nutritionist-auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, 'none'),
+  nutritionistRegister: (name: string, email: string, password: string, inviteToken?: string) =>
+    req<{ token: string }>('/nutritionist-auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, inviteToken }) }, 'none'),
+  createNutritionistInvite: () => nutriReq<{ inviteToken: string }>('/nutritionist-auth/invite', { method: 'POST' }),
+
+  // ===== Paziente =====
   getState: () => req<AppState>('/state'),
   // date facoltativa: assente = oggi (comportamento invariato), altrimenti
   // backfill di un giorno precedente aperto dal grafico "Andamento".
@@ -41,8 +81,6 @@ export const api = {
   savePlanNotes: (notes: PlanNotes) => req<PlanNotes>('/plan/notes', { method: 'POST', body: JSON.stringify(notes) }),
   extractMealPhoto: (fileBase64: string, mediaType: string) =>
     req<string[]>('/meal-photo/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
-  getPatients: () => req<PatientListItem[]>('/patients'),
-  getPatient: (id: string) => req<PatientDetail>(`/patients/${id}`),
   getReportActivity: (month: string) => req<string[]>(`/report/activity?month=${month}`),
   getReport: (from: string, to: string) => req<Report>(`/report?from=${from}&to=${to}`),
   getReportMacros: (from: string, to: string) => req<ReportMacros>(`/report/macros?from=${from}&to=${to}`),
@@ -70,6 +108,22 @@ export const api = {
     req<Habit[]>('/habits', { method: 'POST', body: JSON.stringify({ items }) }),
   checkHabit: (id: number, done: boolean) =>
     req<Habit[]>(`/habits/${id}/check`, { method: 'PUT', body: JSON.stringify({ done }) }),
+  getMessages: () => req<Message[]>('/messages'),
+  sendMessage: (text: string) => req<Message[]>('/messages', { method: 'POST', body: JSON.stringify({ text }) }),
+
+  // ===== Dashboard nutrizionista =====
+  getNutritionistPatients: () => nutriReq<NutritionistPatientListItem[]>('/nutritionist/patients'),
+  createPatient: (name: string) => nutriReq<{ id: number; name: string; accessCode: string }>('/nutritionist/patients', { method: 'POST', body: JSON.stringify({ name }) }),
+  getNutritionistPatient: (id: number) => nutriReq<NutritionistPatientDetail>(`/nutritionist/patients/${id}`),
+  setPatientNextVisit: (id: number, nextVisitAt: string, nextVisitNote: string) =>
+    nutriReq<{ nextVisitAt: string; nextVisitNote: string }>(`/nutritionist/patients/${id}/next-visit`, { method: 'PUT', body: JSON.stringify({ nextVisitAt, nextVisitNote }) }),
+  getPatientReport: (id: number, from: string, to: string) => nutriReq<Report>(`/nutritionist/patients/${id}/report?from=${from}&to=${to}`),
+  getPatientReportMacros: (id: number, from: string, to: string) => nutriReq<ReportMacros>(`/nutritionist/patients/${id}/report/macros?from=${from}&to=${to}`),
+  getPatientMessages: (id: number) => nutriReq<Message[]>(`/nutritionist/patients/${id}/messages`),
+  sendPatientMessage: (id: number, text: string) => nutriReq<Message[]>(`/nutritionist/patients/${id}/messages`, { method: 'POST', body: JSON.stringify({ text }) }),
+  regeneratePatientCode: (id: number) => nutriReq<{ accessCode: string }>(`/nutritionist/patients/${id}/regenerate-code`, { method: 'POST' }),
+  getNutritionistTeam: () => nutriReq<NutritionistTeamMember[]>('/nutritionist/team'),
+  resetNutritionistPassword: (id: number) => nutriReq<{ password: string }>(`/nutritionist/team/${id}/reset-password`, { method: 'POST' }),
 };
 
 export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
