@@ -11,6 +11,7 @@ import { mealPhotoRouter } from './routes/mealPhoto.js';
 import { reportRouter } from './routes/report.js';
 import { supplementsRouter } from './routes/supplements.js';
 import { chefRouter } from './routes/chef.js';
+import { habitsRouter } from './routes/habits.js';
 import { initDb, isRemoteDb } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +31,7 @@ app.use('/api', mealPhotoRouter);
 app.use('/api', reportRouter);
 app.use('/api', supplementsRouter);
 app.use('/api', chefRouter);
+app.use('/api', habitsRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb() }));
 

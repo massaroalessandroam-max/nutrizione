@@ -10,7 +10,7 @@
 import { isInSeason } from './seasonal.js';
 
 export type Tone = 'good' | 'ok' | 'bad';
-export type VerdictReason = 'plan' | 'plan-over-limit' | 'season-in' | 'season-out' | 'list' | 'none';
+export type VerdictReason = 'divieto' | 'plan' | 'plan-over-limit' | 'season-in' | 'season-out' | 'list' | 'none';
 
 export interface Verdict {
   tone: Tone;
@@ -18,7 +18,17 @@ export interface Verdict {
 }
 
 export interface MatchContext {
+  // Alimenti/comportamenti vietati dal nutrizionista (allergie, intolleranze,
+  // controindicazioni) — hanno priorità assoluta su tutto il resto, piano
+  // compreso: un piano scritto prima di scoprire un'allergia non deve poter
+  // dare "consigliato dal piano" a un divieto.
+  divieti?: string[];
   planFoods?: string[];
+  // Categoria (Carboidrati/Proteine/...) per ciascun alimento del piano,
+  // chiave = nome pianificato in minuscolo. Usata per accorgersi che un
+  // pasto è nutrizionalmente sbilanciato (es. riso+pane+pasta) anche se
+  // ogni singolo alimento preso a sé è "consigliato dal piano".
+  planCategories?: Record<string, string>;
   // Nomi (lowercase) degli alimenti del piano il cui tetto settimanale
   // ("massimo X volte a settimana") è già stato raggiunto o superato questa
   // settimana — calcolato dal chiamante su meals/nutrition_plan_items.
@@ -51,6 +61,8 @@ export function verdictOf(name: string, ctx: MatchContext = {}): Verdict {
   const n = name.toLowerCase().trim();
   const month = ctx.month ?? new Date().getMonth() + 1;
 
+  if (ctx.divieti?.some((d) => foodMatches(n, d))) return { tone: 'bad', reason: 'divieto' };
+
   const matchedPlan = ctx.planFoods?.find((p) => foodMatches(n, p));
   if (matchedPlan) {
     if (ctx.overLimitPlanNames?.has(matchedPlan.toLowerCase())) return { tone: 'bad', reason: 'plan-over-limit' };
@@ -81,18 +93,42 @@ export interface Score {
   tone: Tone | 'none';
 }
 
+// Un pasto con almeno 2 alimenti riconosciuti nel piano che appartengono
+// TUTTI alla stessa macro-categoria (es. riso+pane+pasta, tutti
+// Carboidrati) non è un pasto completo, anche se ogni alimento preso da
+// solo è "consigliato dal piano". Alimenti non riconosciuti nel piano non
+// contano né a favore né contro: senza la loro categoria non possiamo
+// giudicare, quindi il controllo si applica solo se ne restano almeno 2
+// classificati.
+function isSingleCategoryMeal(foods: string[], ctx: MatchContext): boolean {
+  if (!ctx.planFoods?.length || !ctx.planCategories) return false;
+  const categories = new Set<string>();
+  let matched = 0;
+  for (const f of foods) {
+    const n = f.toLowerCase().trim();
+    const matchedPlan = ctx.planFoods.find((p) => foodMatches(n, p));
+    if (!matchedPlan) continue;
+    const category = ctx.planCategories[matchedPlan.toLowerCase()];
+    if (!category) continue;
+    matched += 1;
+    categories.add(category);
+  }
+  return matched >= 2 && categories.size === 1;
+}
+
 export function score(foods: string[], ctx: MatchContext = {}): Score {
   if (!foods.length) return { label: '—', tone: 'ok' };
   const tones = foods.map((f) => verdict(f, ctx));
   const bad = tones.filter((t) => t === 'bad').length;
   const good = tones.filter((t) => t === 'good').length;
-  if (bad === 0 && good >= 1) return { label: 'Buona scelta', tone: 'good' };
   if (bad >= 2) return { label: 'Da rivedere', tone: 'bad' };
+  if (bad === 0 && good >= 1 && !isSingleCategoryMeal(foods, ctx)) return { label: 'Buona scelta', tone: 'good' };
   return { label: 'Nel complesso ok', tone: 'ok' };
 }
 
 export function verdictLabel(v: Verdict): string {
   switch (v.reason) {
+    case 'divieto': return 'Vietato dal nutrizionista';
     case 'plan': return 'Consigliato dal piano';
     case 'plan-over-limit': return 'Troppe volte questa settimana';
     case 'season-in': return 'Frutta/verdura di stagione';

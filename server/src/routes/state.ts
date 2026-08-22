@@ -51,9 +51,12 @@ async function loadWeekFoods(date: string): Promise<string[]> {
 // superato questa settimana finisce in overLimitPlanNames, così il match
 // engine lo segnala invece di darlo per "buono" a prescindere.
 async function loadMatchContext(date: string): Promise<MatchContext> {
-  const { rows } = await db.execute('SELECT name, max_per_week FROM nutrition_plan_items');
-  const planItems = (rows as any[]).map((r) => ({ name: r.name as string, maxPerWeek: r.max_per_week as string }));
+  const { rows } = await db.execute('SELECT name, category, max_per_week FROM nutrition_plan_items');
+  const planItems = (rows as any[]).map((r) => ({ name: r.name as string, category: r.category as string, maxPerWeek: r.max_per_week as string }));
   const planFoods = planItems.map((p) => p.name);
+  const planCategories = Object.fromEntries(
+    planItems.filter((p) => p.category).map((p) => [p.name.toLowerCase(), p.category])
+  );
 
   const weekFoods = await loadWeekFoods(date);
   const overLimitPlanNames = new Set<string>();
@@ -64,7 +67,17 @@ async function loadMatchContext(date: string): Promise<MatchContext> {
     if (count > cap) overLimitPlanNames.add(item.name.toLowerCase());
   }
 
-  return { planFoods, overLimitPlanNames, month: new Date().getMonth() + 1 };
+  const divieti = await loadDivieti();
+
+  return { planFoods, planCategories, overLimitPlanNames, divieti, month: new Date().getMonth() + 1 };
+}
+
+// Divieti espliciti del nutrizionista (allergie, intolleranze, controindicazioni),
+// caricati come il piano da PianoView: hanno priorità assoluta nel match engine.
+async function loadDivieti(): Promise<string[]> {
+  const { rows } = await db.execute('SELECT divieti FROM plan_notes WHERE id = 1');
+  const row = rows[0] as any;
+  return row ? JSON.parse(row.divieti) : [];
 }
 
 // I pasti "attivi" sono quelli che il paziente fa di solito (impostati in
@@ -91,18 +104,27 @@ function readFastingPref(appState: any) {
 
 async function loadMeals(date: string) {
   const { rows } = await db.execute({
-    sql: 'SELECT meal_key, done, foods, time, skipped FROM meals WHERE date = ?',
+    sql: 'SELECT meal_key, done, foods, time, skipped, mood FROM meals WHERE date = ?',
     args: [date],
   });
   const byKey = new Map((rows as any[]).map((r) => [r.meal_key, r]));
-  const meals: Record<MealKey, { done: boolean; foods: string[]; time: string; skipped: boolean }> = {} as any;
+  const meals: Record<MealKey, { done: boolean; foods: string[]; time: string; skipped: boolean; mood: number }> = {} as any;
   for (const key of ORDER) {
     const row = byKey.get(key) as any;
     meals[key] = row
-      ? { done: !!row.done, foods: JSON.parse(row.foods), time: row.time, skipped: !!row.skipped }
-      : { done: false, foods: [], time: '', skipped: false };
+      ? { done: !!row.done, foods: JSON.parse(row.foods), time: row.time, skipped: !!row.skipped, mood: row.mood ?? 0 }
+      : { done: false, foods: [], time: '', skipped: false, mood: 0 };
   }
   return meals;
+}
+
+// Una data passata dal client (log di un pasto per un giorno precedente non
+// segnato) dev'essere una data valida e non futura, altrimenti si ricade su
+// oggi — stessa idea di isMealKey: input non fidato, normalizzato subito.
+export function resolveDate(input: unknown): string {
+  const today = todayStr();
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input) && input <= today) return input;
+  return today;
 }
 
 export async function buildState() {
@@ -162,6 +184,14 @@ stateRouter.get('/state', async (_req, res) => {
   res.json(await buildState());
 });
 
+// Pasti di un giorno precedente (non quello di oggi, già in /state) — usato
+// per registrare a posteriori un pasto/alimento non segnato quando si clicca
+// un giorno nel grafico "Andamento".
+stateRouter.get('/meals', async (req, res) => {
+  const date = resolveDate(req.query.date);
+  res.json(await loadMeals(date));
+});
+
 stateRouter.put('/settings/freq', async (req, res) => {
   const { freq } = req.body ?? {};
   if (!['meal', 'multi', 'day', 'manual'].includes(freq)) {
@@ -200,7 +230,9 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
     : [];
   if (!foods.length) return res.status(400).json({ error: 'no foods provided' });
 
-  const date = todayStr();
+  // Se il client manda una data (backfill di un giorno precedente dal
+  // grafico "Andamento") si registra su quella, non su oggi.
+  const date = resolveDate(req.body?.date);
   const time = romeParts().time;
 
   // Un pasto può accumulare più registrazioni nello stesso giorno (es.
@@ -226,6 +258,7 @@ stateRouter.post('/meals/:key/log', async (req, res) => {
   const sc = score(foods, ctx);
   const summary = {
     key,
+    date,
     label: LABEL[key],
     foods: foods.map((f) => {
       const v = verdictOf(f, ctx);
@@ -249,7 +282,7 @@ stateRouter.put('/meals/:key/log', async (req, res) => {
     ? req.body.foods.map((f: unknown) => String(f).trim()).filter(Boolean)
     : [];
 
-  const date = todayStr();
+  const date = resolveDate(req.body?.date);
   const { rows } = await db.execute({
     sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
     args: [date, key],
@@ -275,7 +308,7 @@ stateRouter.delete('/meals/:key/log', async (req, res) => {
   const { key } = req.params;
   if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
 
-  const date = todayStr();
+  const date = resolveDate(req.query.date);
   const { rows } = await db.execute({
     sql: 'SELECT foods FROM meals WHERE date = ? AND meal_key = ?',
     args: [date, key],
@@ -307,6 +340,21 @@ stateRouter.put('/meals/:key/skip', async (req, res) => {
           ON CONFLICT(date, meal_key) DO UPDATE SET skipped = excluded.skipped`,
     args: [date, key, skipped],
   });
+
+  res.json(await buildState());
+});
+
+// Valutazione dell'umore dopo il pasto (1-5), impostata con una chiamata a
+// parte dal riepilogo mostrato dopo la registrazione — non blocca il flusso
+// di log stesso, il paziente può chiuderlo senza valutare.
+stateRouter.put('/meals/:key/mood', async (req, res) => {
+  const { key } = req.params;
+  if (!isMealKey(key)) return res.status(400).json({ error: 'invalid meal key' });
+  const mood = Number(req.body?.mood);
+  if (!Number.isInteger(mood) || mood < 1 || mood > 5) return res.status(400).json({ error: 'mood non valido (1-5)' });
+  const date = resolveDate(req.body?.date);
+
+  await db.execute({ sql: 'UPDATE meals SET mood = ? WHERE date = ? AND meal_key = ?', args: [mood, date, key] });
 
   res.json(await buildState());
 });

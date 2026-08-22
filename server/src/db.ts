@@ -95,6 +95,13 @@ export async function initDb(): Promise<void> {
   } catch {
     // colonna già presente
   }
+  // Umore del paziente dopo il pasto (1-5), impostato con una chiamata a
+  // parte dopo la conferma di registrazione — 0 = non ancora valutato.
+  try {
+    await db.execute('ALTER TABLE meals ADD COLUMN mood INTEGER NOT NULL DEFAULT 0');
+  } catch {
+    // colonna già presente
+  }
   await db.execute(`
     CREATE TABLE IF NOT EXISTS patients (
       id TEXT PRIMARY KEY,
@@ -155,6 +162,17 @@ export async function initDb(): Promise<void> {
       uploaded_at TEXT NOT NULL
     );
   `);
+  // Testo del piano che non è un "alimento con grammatura": regole generali,
+  // esempi di pasto per tipologia e divieti. Riga singola come app_state,
+  // liste/mappe serializzate JSON (stesso pattern di food_category_weights).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS plan_notes (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      general_rules TEXT NOT NULL DEFAULT '[]',
+      meal_examples TEXT NOT NULL DEFAULT '{}',
+      divieti TEXT NOT NULL DEFAULT '[]'
+    );
+  `);
 
   // Destinatari email del report (con alias, es. "Dott.ssa Rossi") e log
   // degli invii effettuati — l'invio automatico vero e proprio richiede un
@@ -175,6 +193,32 @@ export async function initDb(): Promise<void> {
       report_from TEXT NOT NULL,
       report_to TEXT NOT NULL,
       body_text TEXT NOT NULL
+    );
+  `);
+
+  // Abitudini da spuntare, giornaliere o settimanali ("N volte a settimana").
+  // id stabile (non idx) perché habit_checks la referenzia: riordinare o
+  // rinominare un'abitudine nel salvataggio in blocco non deve corrompere lo
+  // storico delle spunte già fatte.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS habits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      idx INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      target_per_week INTEGER NOT NULL DEFAULT 7,
+      time TEXT NOT NULL DEFAULT ''
+    );
+  `);
+  // Una spunta per abitudine/giorno. Il conteggio settimanale è a finestra
+  // mobile di 7 giorni (stessa convenzione di loadWeekFoods per il piano),
+  // non settimana solare.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS habit_checks (
+      habit_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (habit_id, date)
     );
   `);
 

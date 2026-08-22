@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import type { LogSummary } from '../../types';
 import { StarIcon } from '../../icons';
 import { toneColor, verdictLabel } from '../../lib/tone';
@@ -8,7 +8,16 @@ interface Props {
   summary: LogSummary | null;
   onClose: () => void;
   onSend: () => void;
+  onSetMood: (mood: number) => void;
 }
+
+const MOOD_OPTIONS: Array<{ value: number; emoji: string; label: string }> = [
+  { value: 1, emoji: '😞', label: 'Giù' },
+  { value: 2, emoji: '😕', label: 'Poco bene' },
+  { value: 3, emoji: '😐', label: 'Neutro' },
+  { value: 4, emoji: '🙂', label: 'Bene' },
+  { value: 5, emoji: '😄', label: 'Ottimo' },
+];
 
 const HEAD_GRADIENT: Record<string, string> = {
   good: 'linear-gradient(150deg, var(--teal-700), var(--teal-900))',
@@ -28,8 +37,19 @@ const SUB: Record<string, string> = {
 
 const CONFETTI_COLORS = ['var(--gold)', '#fff', 'var(--border-subtle)'];
 
-export function SummaryOverlay({ open, summary, onClose, onSend }: Props) {
+export function SummaryOverlay({ open, summary, onClose, onSend, onSetMood }: Props) {
+  const [selectedMood, setSelectedMood] = useState(0);
+
+  useEffect(() => {
+    if (open) setSelectedMood(0);
+  }, [open]);
+
   if (!open || !summary) return null;
+
+  const pickMood = (value: number) => {
+    setSelectedMood(value);
+    onSetMood(value);
+  };
 
   const tone = summary.score.tone;
   const isGood = tone === 'good';
@@ -76,6 +96,22 @@ export function SummaryOverlay({ open, summary, onClose, onSend }: Props) {
             </li>
           ))}
         </ul>
+
+        <div className="nm-summary-body-title" style={{ marginTop: 4 }}>Come ti senti dopo questo pasto?</div>
+        <div className="nm-mood-row">
+          {MOOD_OPTIONS.map((m) => (
+            <button
+              key={m.value}
+              className={`nm-mood-btn ${selectedMood === m.value ? 'is-on' : ''}`}
+              onClick={() => pickMood(m.value)}
+              aria-label={m.label}
+              title={m.label}
+            >
+              {m.emoji}
+            </button>
+          ))}
+        </div>
+
         <div className="nm-summary-actions">
           <button className="nm-btn-ghost" onClick={onClose}>Chiudi</button>
           <button className="nm-btn-primary" onClick={onSend}>Invia al nutrizionista</button>

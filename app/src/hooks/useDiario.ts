@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { fileToBase64 } from '../lib/file';
-import type { AppState, FastingPref, LogSummary, MealKey, Schedule, PatientDetail, PatientListItem } from '../types';
+import type { AppState, DayMealState, FastingPref, LogSummary, MealKey, Schedule, PatientDetail, PatientListItem } from '../types';
 import { MEAL_ORDER } from '../types';
 
 export type Role = 'paziente' | 'nutrizionista';
-export type Tab = 'diario' | 'premi' | 'digiuno' | 'piano' | 'report';
+export type Tab = 'diario' | 'abitudini' | 'premi' | 'piano' | 'report';
 export type LogMode = 'text' | 'audio' | 'photo';
 
 export function useDiario() {
@@ -26,6 +26,11 @@ export function useDiario() {
   const [photoExtracting, setPhotoExtracting] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [lastSummary, setLastSummary] = useState<LogSummary | null>(null);
+  // Non-null quando il sheet è aperto per registrare un pasto/alimento non
+  // segnato di un giorno precedente (click su un giorno nel grafico
+  // "Andamento"), invece del pasto di oggi.
+  const [backfillDate, setBackfillDate] = useState<string | null>(null);
+  const [backfillMeals, setBackfillMeals] = useState<Record<MealKey, DayMealState> | null>(null);
 
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -71,7 +76,7 @@ export function useDiario() {
   // sheet non si può cambiare pasto. Il testo/foto parte sempre vuoto: ogni
   // registrazione si AGGIUNGE a quelle già fatte per quel pasto oggi (es.
   // yogurt alle 6, poi uova e pane alle 8), non le sostituisce.
-  const openSheet = useCallback((key: MealKey, locked = true) => {
+  const openSheet = useCallback((key: MealKey, locked = true, date: string | null = null) => {
     setActiveMeal(key);
     setMode('text');
     setLogText('');
@@ -79,6 +84,7 @@ export function useDiario() {
     setPhotoFoods(null);
     setPhotoError('');
     setMealLocked(locked);
+    setBackfillDate(date);
     setSheetOpen(true);
   }, []);
 
@@ -94,7 +100,21 @@ export function useDiario() {
     openSheet(nextMeal, false);
   }, [appState, openSheet]);
 
-  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  // Aperto dal grafico "Andamento" cliccando un giorno precedente: carica i
+  // pasti già segnati quel giorno (per non sovrascriverli) e propone il
+  // primo non ancora fatto, pasto comunque cambiabile.
+  const openBackfill = useCallback(async (date: string) => {
+    const meals = await api.getMealsForDate(date);
+    setBackfillMeals(meals);
+    const nextMeal = MEAL_ORDER.find((k) => !meals[k].done) ?? 'colazione';
+    openSheet(nextMeal, false, date);
+  }, [openSheet]);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setBackfillDate(null);
+    setBackfillMeals(null);
+  }, []);
 
   const applyTranscript = useCallback((text: string) => {
     setLogText(text);
@@ -125,12 +145,14 @@ export function useDiario() {
       mode === 'photo' ? photoFoods ?? [] : logText.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
     if (!foods.length) return;
 
-    const { state, summary } = await api.logMeal(activeMeal, foods);
+    const { state, summary } = await api.logMeal(activeMeal, foods, backfillDate ?? undefined);
     setAppState(state);
     setLastSummary(summary);
     setSheetOpen(false);
+    setBackfillDate(null);
+    setBackfillMeals(null);
     setSummaryOpen(true);
-  }, [mode, photoFoods, logText, activeMeal]);
+  }, [mode, photoFoods, logText, activeMeal, backfillDate]);
 
   const closeSummary = useCallback(() => setSummaryOpen(false), []);
 
@@ -138,6 +160,12 @@ export function useDiario() {
     setSummaryOpen(false);
     showToast('Pasto inviato al nutrizionista');
   }, [showToast]);
+
+  const setMood = useCallback(async (mood: number) => {
+    if (!lastSummary) return;
+    const s = await api.setMealMood(lastSummary.key, mood, lastSummary.date);
+    setAppState(s);
+  }, [lastSummary]);
 
   const completeOnboarding = useCallback(
     async (name: string, schedule: Omit<Schedule, 'snacks'>, snacks: string[], fasting: FastingPref) => {
@@ -154,10 +182,13 @@ export function useDiario() {
   }, [showToast]);
 
   const updateMealFoods = useCallback(async (key: MealKey, foods: string[]) => {
-    const s = await api.updateMealFoods(key, foods);
+    const s = await api.updateMealFoods(key, foods, backfillDate ?? undefined);
     setAppState(s);
     showToast('Pasto aggiornato');
-  }, [showToast]);
+    // Il sheet legge "già registrato" da backfillMeals (non da appState per
+    // un giorno passato): va riallineato dopo la modifica.
+    if (backfillDate) setBackfillMeals(await api.getMealsForDate(backfillDate));
+  }, [showToast, backfillDate]);
 
   const skipMeal = useCallback(async (key: MealKey, skipped: boolean) => {
     const s = await api.skipMeal(key, skipped);
@@ -190,8 +221,6 @@ export function useDiario() {
     setAppState(s);
   }, []);
 
-  const goDigiuno = useCallback(() => setTab('digiuno'), []);
-
   const selectPatient = useCallback((id: string) => setActivePatientId(id), []);
   const backToList = useCallback(() => setActivePatientId(null), []);
 
@@ -203,8 +232,9 @@ export function useDiario() {
   return {
     role, changeRole, tab, setTab,
     appState, loading, refreshState,
-    sheetOpen, openSheet, openLogQuick, closeSheet,
-    summaryOpen, closeSummary, sendFromSummary, lastSummary,
+    sheetOpen, openSheet, openLogQuick, openBackfill, closeSheet,
+    backfillDate, backfillMeals,
+    summaryOpen, closeSummary, sendFromSummary, lastSummary, setMood,
     activeMeal, setActiveMeal, mealLocked,
     mode, setMode,
     logText, setLogText,
@@ -216,7 +246,7 @@ export function useDiario() {
     deleteMeal,
     updateMealFoods,
     skipMeal,
-    toggleFast, fastToggling, setFreq, goDigiuno,
+    toggleFast, fastToggling, setFreq,
     supplementSheetOpen, openSupplementSheet, closeSupplementSheet,
     patients, activePatientId, activePatient, selectPatient, backToList,
   };

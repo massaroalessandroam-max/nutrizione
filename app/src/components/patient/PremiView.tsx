@@ -2,14 +2,15 @@ import type { AppState } from '../../types';
 
 interface Props {
   state: AppState;
+  onDayClick: (date: string) => void;
 }
 
-export function PremiView({ state }: Props) {
+export function PremiView({ state, onDayClick }: Props) {
   const maxDone = Math.max(1, ...state.week.map((d) => d.doneCount));
 
   return (
     <div className="nm-section">
-      <div className="nm-page-title">I tuoi progressi</div>
+      <div className="nm-page-title">Andamento</div>
       <div className="nm-page-sub">Ogni pasto registrato ti avvicina all'obiettivo.</div>
 
       <div className="nm-stat-row">
@@ -29,18 +30,25 @@ export function PremiView({ state }: Props) {
 
       <div className="nm-week-card">
         <div className="nm-week-card-title">Ultimi 7 giorni</div>
+        <div className="nm-page-sub" style={{ marginTop: -4, marginBottom: 4 }}>Tocca un giorno precedente per registrare un pasto non segnato.</div>
         <div className="nm-week-chart">
           {state.week.map((d) => {
             const color = d.isToday ? 'var(--gold)' : d.doneCount > 0 ? 'var(--teal-700)' : 'var(--neutral-chip)';
             const labelColor = d.isToday ? 'var(--ink)' : 'var(--ink-faint)';
             const heightPct = d.doneCount === 0 ? 6 : Math.round((d.doneCount / maxDone) * 100);
             return (
-              <div key={d.date} className="nm-week-day">
+              <button
+                key={d.date}
+                className="nm-week-day nm-week-day-btn"
+                disabled={d.isToday}
+                onClick={() => onDayClick(d.date)}
+                aria-label={`Registra un pasto per ${d.dayLabel}`}
+              >
                 <div className="nm-week-bar-track">
                   <div className="nm-week-bar-fill" style={{ height: `${heightPct}%`, background: color }} />
                 </div>
                 <span className="nm-week-day-label" style={{ color: labelColor, fontWeight: d.isToday ? 700 : 500 }}>{d.dayLabel}</span>
-              </div>
+              </button>
             );
           })}
         </div>

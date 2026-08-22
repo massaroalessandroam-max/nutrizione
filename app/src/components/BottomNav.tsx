@@ -3,8 +3,8 @@ import { NavIcon } from '../icons';
 
 const NAV_ITEMS: Array<{ key: Tab; label: string }> = [
   { key: 'diario', label: 'Diario' },
-  { key: 'premi', label: 'Premi' },
-  { key: 'digiuno', label: 'Digiuno' },
+  { key: 'abitudini', label: 'Abitudini' },
+  { key: 'premi', label: 'Andamento' },
   { key: 'piano', label: 'Piano' },
   { key: 'report', label: 'Report' },
 ];

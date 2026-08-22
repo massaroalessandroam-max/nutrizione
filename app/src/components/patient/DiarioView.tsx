@@ -3,20 +3,21 @@ import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
 import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon, PillIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
-import { formatDateLabel } from '../../lib/mealMeta';
+import { formatDateLabel, MOOD_EMOJI } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
 
 interface Props {
   state: AppState;
   onOpenMeal: (key: MealKey) => void;
   onOpenLogQuick: () => void;
-  onGoDigiuno: () => void;
+  onToggleFast: () => void;
+  fastToggling: boolean;
   onDeleteMeal: (key: MealKey) => void;
   onSkipMeal: (key: MealKey, skipped: boolean) => void;
   onOpenSupplements: () => void;
 }
 
-export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onDeleteMeal, onSkipMeal, onOpenSupplements }: Props) {
+export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fastToggling, onDeleteMeal, onSkipMeal, onOpenSupplements }: Props) {
   const now = useNow(state.fastActive);
   const elapsedMs = Math.max(0, now - state.fastStart);
   const h = Math.floor(elapsedMs / 3600000);
@@ -110,7 +111,7 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
                   </div>
                   <div className="nm-meal-preview">
                     {meal.done
-                      ? `+${meal.foods.length} ${meal.foods.length === 1 ? 'alimento' : 'alimenti'}`
+                      ? `+${meal.foods.length} ${meal.foods.length === 1 ? 'alimento' : 'alimenti'}${meal.mood ? ` · ${MOOD_EMOJI[meal.mood]}` : ''}`
                       : meal.skipped ? 'Saltato oggi' : 'Tocca per registrare'}
                   </div>
                 </div>
@@ -152,14 +153,19 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onGoDigiuno, onD
         })}
       </div>
 
-      {state.fastActive && (
-        <button className="nm-fast-mini" onClick={onGoDigiuno}>
+      {state.fastActive ? (
+        <button className="nm-fast-mini" onClick={onToggleFast} disabled={fastToggling}>
           <ClockIcon size={15} color="var(--teal-700)" />
           <div className="nm-fast-mini-body">
             <div className="nm-fast-mini-title">Digiuno in corso</div>
-            <div className="nm-fast-mini-sub">{h}h {String(m).padStart(2, '0')}m</div>
+            <div className="nm-fast-mini-sub">{h}h {String(m).padStart(2, '0')}m · tocca per terminare</div>
           </div>
           <span className="nm-fast-mini-pct">{Math.round(fastPct * 100)}%</span>
+        </button>
+      ) : (
+        <button className="nm-cta-secondary" onClick={onToggleFast} disabled={fastToggling}>
+          <ClockIcon size={15} />
+          Inizia digiuno
         </button>
       )}
 

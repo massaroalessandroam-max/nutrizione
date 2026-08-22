@@ -15,6 +15,13 @@ export function extractJsonArray(text: string): unknown {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+export function extractJsonObject(text: string): unknown {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) throw new Error('nessun oggetto JSON nella risposta');
+  return JSON.parse(text.slice(start, end + 1));
+}
+
 // Lancia un errore con .code = 'api_unavailable' se la chiamata ad Anthropic
 // fallisce (rete/HTTP), per distinguerlo da un errore di parsing della
 // risposta — i chiamanti mostrano messaggi diversi per i due casi.

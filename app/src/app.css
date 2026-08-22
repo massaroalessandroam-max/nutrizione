@@ -209,6 +209,8 @@
 .nm-week-card-title { font-weight: 600; font-size: 14px; margin-bottom: 12px; }
 .nm-week-chart { display: flex; justify-content: space-between; gap: 5px; }
 .nm-week-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.nm-week-day-btn { background: none; border: none; padding: 0; font: inherit; cursor: pointer; }
+.nm-week-day-btn:disabled { cursor: default; }
 .nm-week-bar-track {
   width: 100%; height: 74px; background: var(--neutral-chip); border-radius: 9px;
   display: flex; align-items: flex-end; overflow: hidden;
@@ -229,27 +231,6 @@
 .nm-badge-progress-track { height: 5px; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
 .nm-badge-progress-fill { height: 100%; background: var(--teal-700); border-radius: 999px; }
 .nm-badge-progress-label { font-size: 10.5px; font-weight: 600; color: var(--ink-faint); margin-top: 4px; }
-
-/* ===== Digiuno ===== */
-.nm-fast-card {
-  display: flex; flex-direction: column; align-items: center; background: var(--dark-surface);
-  border-radius: 24px; padding: 30px 20px; color: #fff;
-}
-.nm-fast-ring-wrap { position: relative; width: 210px; height: 210px; }
-.nm-fast-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.nm-fast-state { font-size: 12px; letter-spacing: .12em; color: var(--ink-on-dark-soft); }
-.nm-fast-elapsed { font-size: 38px; font-weight: 700; line-height: 1.1; margin-top: 4px; }
-.nm-fast-target { font-size: 12px; color: var(--ink-on-dark-soft); margin-top: 2px; }
-.nm-fast-toggle {
-  margin-top: 22px; border: none; border-radius: 13px; padding: 14px 34px;
-  font-weight: 600; font-size: 14px; cursor: pointer;
-}
-.nm-fast-toggle.is-active { background: rgba(255, 255, 255, .16); color: #fff; }
-.nm-fast-toggle.is-inactive { background: var(--gold); color: var(--gold-ink); }
-.nm-fast-info-row { display: flex; gap: 11px; margin-top: 14px; }
-.nm-fast-info-card { flex: 1; background: var(--card); border-radius: 16px; padding: 14px; border: 1px solid var(--line-soft); }
-.nm-fast-info-label { font-size: 11px; color: var(--ink-soft); }
-.nm-fast-info-value { font-size: 17px; font-weight: 600; margin-top: 3px; }
 
 /* ===== Report ===== */
 .nm-freq-list { display: flex; flex-direction: column; gap: 9px; margin-bottom: 20px; }
@@ -520,6 +501,47 @@
   margin-top: 10px; width: 34px; height: 34px; flex: none; border: none; border-radius: 10px;
   background: var(--neutral-chip); color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer;
 }
+/* ===== Abitudini — stile minimale tipo Notion, niente card/pulsanti ===== */
+.nm-habit-list { margin-top: 14px; }
+.nm-habit-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.nm-habit-row:last-child { border-bottom: none; }
+.nm-habit-check {
+  flex: none; width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid var(--line-medium);
+  background: var(--card); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.nm-habit-check.is-on { background: var(--teal-700); border-color: var(--teal-700); }
+.nm-habit-text {
+  flex: 1; min-width: 0; border: none; background: none; font-size: 14.5px; font-weight: 500;
+  color: var(--ink); padding: 3px 2px;
+}
+.nm-habit-text:focus { outline: none; background: var(--neutral-chip); border-radius: 6px; }
+.nm-habit-time {
+  flex: none; width: 78px; border: none; background: none; color: var(--ink-faint); font-size: 12.5px; padding: 3px 2px;
+}
+.nm-habit-time:focus { outline: none; background: var(--neutral-chip); border-radius: 6px; }
+.nm-habit-freq {
+  flex: none; border: none; background: none; color: var(--ink-faint); font-size: 12.5px; padding: 3px 2px; cursor: pointer;
+}
+.nm-habit-progress { flex: none; font-size: 11.5px; font-weight: 600; color: var(--teal-700); white-space: nowrap; }
+.nm-habit-delete {
+  flex: none; border: none; background: none; color: var(--ink-faint); cursor: pointer; padding: 2px;
+  opacity: 0; transition: opacity .1s;
+}
+.nm-habit-row:hover .nm-habit-delete { opacity: 1; }
+.nm-habit-add-row { display: flex; align-items: center; gap: 8px; padding: 9px 4px; }
+.nm-habit-add-input {
+  flex: 1; border: none; background: none; font-size: 14.5px; color: var(--ink); padding: 3px 2px;
+}
+.nm-habit-add-input:focus { outline: none; }
+.nm-habit-add-trigger {
+  border: none; background: none; color: var(--ink-faint); font-size: 14.5px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; padding: 9px 4px;
+}
+.nm-habit-add-trigger:hover { color: var(--ink); }
+
 .nm-onboard-add-btn {
   margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; border: 1.5px dashed var(--line-strong); border-radius: 10px; background: transparent;
@@ -611,6 +633,12 @@
 .nm-summary-food-item::marker { color: var(--marker-color, var(--ink-faint)); font-size: 1.2em; }
 .nm-summary-food-name { font-weight: 600; font-size: 14px; }
 .nm-summary-food-verdict { font-size: 12px; font-weight: 600; }
+.nm-mood-row { display: flex; gap: 8px; margin-top: 10px; }
+.nm-mood-btn {
+  flex: 1; background: var(--card); border: 1.5px solid var(--line-soft); border-radius: 14px;
+  padding: 10px 0; font-size: 22px; cursor: pointer; line-height: 1;
+}
+.nm-mood-btn.is-on { border-color: var(--teal-700); background: var(--good-bg); }
 .nm-summary-actions { display: flex; gap: 11px; margin-top: 20px; }
 .nm-btn-ghost {
   flex: 1; background: var(--card); border: 1.5px solid var(--line-strong); color: var(--ink);

@@ -1,4 +1,4 @@
-import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, Schedule, FastingPref, Tone } from './types';
+import type { AppState, LogResponse, PatientListItem, PatientDetail, MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitFrequency } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -14,13 +14,19 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getState: () => req<AppState>('/state'),
-  logMeal: (key: MealKey, foods: string[]) =>
-    req<LogResponse>(`/meals/${key}/log`, { method: 'POST', body: JSON.stringify({ foods }) }),
-  updateMealFoods: (key: MealKey, foods: string[]) =>
-    req<AppState>(`/meals/${key}/log`, { method: 'PUT', body: JSON.stringify({ foods }) }),
-  deleteMeal: (key: MealKey) => req<AppState>(`/meals/${key}/log`, { method: 'DELETE' }),
+  // date facoltativa: assente = oggi (comportamento invariato), altrimenti
+  // backfill di un giorno precedente aperto dal grafico "Andamento".
+  logMeal: (key: MealKey, foods: string[], date?: string) =>
+    req<LogResponse>(`/meals/${key}/log`, { method: 'POST', body: JSON.stringify({ foods, date }) }),
+  updateMealFoods: (key: MealKey, foods: string[], date?: string) =>
+    req<AppState>(`/meals/${key}/log`, { method: 'PUT', body: JSON.stringify({ foods, date }) }),
+  deleteMeal: (key: MealKey, date?: string) =>
+    req<AppState>(`/meals/${key}/log${date ? `?date=${date}` : ''}`, { method: 'DELETE' }),
   skipMeal: (key: MealKey, skipped: boolean) =>
     req<AppState>(`/meals/${key}/skip`, { method: 'PUT', body: JSON.stringify({ skipped }) }),
+  setMealMood: (key: MealKey, mood: number, date?: string) =>
+    req<AppState>(`/meals/${key}/mood`, { method: 'PUT', body: JSON.stringify({ mood, date }) }),
+  getMealsForDate: (date: string) => req<Record<MealKey, DayMealState>>(`/meals?date=${date}`),
   toggleFast: () => req<AppState>('/fast/toggle', { method: 'POST' }),
   setFreq: (freq: AppState['freq']) =>
     req<AppState>('/settings/freq', { method: 'PUT', body: JSON.stringify({ freq }) }),
@@ -29,8 +35,10 @@ export const api = {
   getPlan: () => req<PlanItem[]>('/plan'),
   savePlan: (items: PlanItem[]) => req<PlanItem[]>('/plan', { method: 'POST', body: JSON.stringify({ items }) }),
   extractPlan: (fileBase64: string, mediaType: string, filename: string, signal?: AbortSignal) =>
-    req<PlanItem[]>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType, filename }), signal }),
+    req<ExtractedPlan>('/plan/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType, filename }), signal }),
   getPlanUploads: () => req<PlanUpload[]>('/plan/uploads'),
+  getPlanNotes: () => req<PlanNotes>('/plan/notes'),
+  savePlanNotes: (notes: PlanNotes) => req<PlanNotes>('/plan/notes', { method: 'POST', body: JSON.stringify(notes) }),
   extractMealPhoto: (fileBase64: string, mediaType: string) =>
     req<string[]>('/meal-photo/extract', { method: 'POST', body: JSON.stringify({ fileBase64, mediaType }) }),
   getPatients: () => req<PatientListItem[]>('/patients'),
@@ -57,6 +65,11 @@ export const api = {
   saveChefCombo: (combo: { id?: number; mealKey: MealKey; days: string[]; slots: ChefSlotItem[] }) =>
     req<{ id: number; combos: ChefCombo[] }>('/chef/combos', { method: 'POST', body: JSON.stringify(combo) }),
   deleteChefCombo: (id: number) => req<ChefCombo[]>(`/chef/combos/${id}`, { method: 'DELETE' }),
+  getHabits: () => req<Habit[]>('/habits'),
+  saveHabits: (items: Array<{ id?: number; text: string; frequency: HabitFrequency; targetPerWeek: number; time: string }>) =>
+    req<Habit[]>('/habits', { method: 'POST', body: JSON.stringify({ items }) }),
+  checkHabit: (id: number, done: boolean) =>
+    req<Habit[]>(`/habits/${id}/check`, { method: 'PUT', body: JSON.stringify({ done }) }),
 };
 
 export const PLAN_CATEGORIES = ['Carboidrati', 'Proteine', 'Legumi', 'Grassi', 'Frutta', 'Verdura', 'Latticini'] as const;
@@ -68,6 +81,20 @@ export interface PlanItem {
   quantity: string;
   category: string;
   maxPerWeek: string;
+}
+
+// Testo del piano che non è un "alimento con grammatura": regole generali
+// valide per ogni pasto, esempi di pasto completo per tipologia, e divieti
+// espliciti (allergie/intolleranze) — separati dagli alimenti (PlanItem)
+// perché non hanno quantità/frequenza, sono testo libero.
+export interface PlanNotes {
+  generalRules: string[];
+  mealExamples: Record<MealKey, string[]>;
+  divieti: string[];
+}
+
+export interface ExtractedPlan extends PlanNotes {
+  items: PlanItem[];
 }
 
 export interface PlanUpload {

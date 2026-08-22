@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
   api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, planUploadDownloadUrl,
-  type PlanItem, type PlanUpload, type ChefCombo,
+  type PlanItem, type PlanNotes, type PlanUpload, type ChefCombo,
 } from '../../api';
 import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
@@ -50,6 +50,8 @@ function formatUploadDate(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+const linesToList = (text: string): string[] => text.split('\n').map((s) => s.trim()).filter(Boolean);
+
 interface Props {
   patientName: string;
 }
@@ -70,6 +72,13 @@ export function PianoView({ patientName }: Props) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [uploads, setUploads] = useState<PlanUpload[] | null>(null);
+  // Testo libero del piano (regole, esempi per pasto, divieti): tenuto come
+  // stringa grezza per riga finché non si salva, per non perdere la riga
+  // vuota che il paziente sta scrivendo a ogni tasto premuto.
+  const [generalRulesText, setGeneralRulesText] = useState('');
+  const [mealExamplesText, setMealExamplesText] = useState<Record<MealKey, string>>({ colazione: '', pranzo: '', cena: '', spuntino: '' });
+  const [divietiText, setDivietiText] = useState('');
+  const [notesLoaded, setNotesLoaded] = useState(false);
   // "Alimenti" è chiuso finché il paziente non tocca il titolo per
   // esplorare le macro-categorie del piano.
   const [alimentiOpen, setAlimentiOpen] = useState(false);
@@ -86,7 +95,20 @@ export function PianoView({ patientName }: Props) {
     api.getPlan().then(setItems).catch(() => setItems([]));
     api.getPlanUploads().then(setUploads).catch(() => setUploads([]));
     api.getChefCombos().then(setCombos).catch(() => setCombos([]));
+    api.getPlanNotes().then(applyNotes).catch(() => setNotesLoaded(true));
   }, []);
+
+  function applyNotes(notes: PlanNotes) {
+    setGeneralRulesText(notes.generalRules.join('\n'));
+    setMealExamplesText({
+      colazione: (notes.mealExamples.colazione ?? []).join('\n'),
+      pranzo: (notes.mealExamples.pranzo ?? []).join('\n'),
+      cena: (notes.mealExamples.cena ?? []).join('\n'),
+      spuntino: (notes.mealExamples.spuntino ?? []).join('\n'),
+    });
+    setDivietiText(notes.divieti.join('\n'));
+    setNotesLoaded(true);
+  }
 
   const poolFor = (category: string) => (items ?? []).filter((it) => it.name.trim() && it.category === category);
   const randomSlotsFor = (meal: MealKey): ChefDraftSlot[] =>
@@ -206,8 +228,9 @@ export function PianoView({ patientName }: Props) {
       const fileBase64 = await fileToBase64(file);
       const mediaType = file.type || 'application/octet-stream';
       const extracted = await api.extractPlan(fileBase64, mediaType, file.name, controller.signal);
-      setItems(extracted);
-      setExpanded(new Set(extracted.map((it) => (PLAN_CATEGORIES as readonly string[]).includes(it.category) ? it.category : OTHER_CATEGORY)));
+      setItems(extracted.items);
+      setExpanded(new Set(extracted.items.map((it) => (PLAN_CATEGORIES as readonly string[]).includes(it.category) ? it.category : OTHER_CATEGORY)));
+      applyNotes({ generalRules: extracted.generalRules, mealExamples: extracted.mealExamples, divieti: extracted.divieti });
       api.getPlanUploads().then(setUploads).catch(() => {});
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -248,7 +271,19 @@ export function PianoView({ patientName }: Props) {
     if (!items) return;
     setSaving(true);
     const clean = items.filter((it) => it.name.trim());
-    const s = await api.savePlan(clean);
+    const [s] = await Promise.all([
+      api.savePlan(clean),
+      api.savePlanNotes({
+        generalRules: linesToList(generalRulesText),
+        mealExamples: {
+          colazione: linesToList(mealExamplesText.colazione),
+          pranzo: linesToList(mealExamplesText.pranzo),
+          cena: linesToList(mealExamplesText.cena),
+          spuntino: linesToList(mealExamplesText.spuntino),
+        },
+        divieti: linesToList(divietiText),
+      }),
+    ]);
     setItems(s);
     setSaving(false);
     setSaved(true);
@@ -308,6 +343,44 @@ export function PianoView({ patientName }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {notesLoaded && (
+        <>
+          <div className="nm-section-label" style={{ marginTop: 20 }}>Regole generali</div>
+          <div className="nm-page-sub">Valide per ogni pasto. Una per riga.</div>
+          <textarea
+            className="nm-text-input"
+            style={{ minHeight: 80, resize: 'vertical' }}
+            value={generalRulesText}
+            onChange={(e) => setGeneralRulesText(e.target.value)}
+            placeholder={'Es. Bere almeno 1,5 L d\'acqua al giorno\nNon saltare mai la colazione'}
+          />
+
+          <div className="nm-section-label" style={{ marginTop: 20 }}>Tipologie di pasto ed esempi</div>
+          {MEAL_ORDER.map((meal) => (
+            <div key={meal} style={{ marginTop: 10 }}>
+              <div className="nm-hint">{MEAL_LABEL[meal]}</div>
+              <textarea
+                className="nm-text-input"
+                style={{ minHeight: 60, resize: 'vertical', marginTop: 4 }}
+                value={mealExamplesText[meal]}
+                onChange={(e) => setMealExamplesText((m) => ({ ...m, [meal]: e.target.value }))}
+                placeholder="Un esempio di pasto completo per riga"
+              />
+            </div>
+          ))}
+
+          <div className="nm-section-label" style={{ marginTop: 20 }}>Divieti</div>
+          <div className="nm-page-sub">Allergie, intolleranze o alimenti vietati (non solo da limitare). Uno per riga.</div>
+          <textarea
+            className="nm-text-input"
+            style={{ minHeight: 80, resize: 'vertical' }}
+            value={divietiText}
+            onChange={(e) => setDivietiText(e.target.value)}
+            placeholder="Es. Arachidi"
+          />
+        </>
       )}
 
       {items === null ? (
@@ -530,11 +603,9 @@ export function PianoView({ patientName }: Props) {
           })
           )}
 
-          {alimentiOpen && (
-            <button className="nm-submit-btn" disabled={saving} onClick={save}>
-              {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
-            </button>
-          )}
+          <button className="nm-submit-btn" style={{ marginTop: 20 }} disabled={saving} onClick={save}>
+            {saving ? 'Salvataggio…' : saved ? 'Salvato ✓' : 'Salva piano'}
+          </button>
 
           {uploads !== null && uploads.length > 0 && (
             <>

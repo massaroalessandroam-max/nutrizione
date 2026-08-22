@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import type { AppState, MealKey } from '../../types';
+import type { MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import type { LogMode } from '../../hooks/useDiario';
 import { MicIcon, ModeIcon, CameraIcon, ChevronIcon, TrashIcon } from '../../icons';
 import { useSpeechRecognition, speechRecognitionSupported } from '../../hooks/useSpeechRecognition';
 import { api, PLAN_CATEGORIES, type PlanItem } from '../../api';
+import { MEAL_LABEL } from '../../lib/mealMeta';
 
 const SUGGESTION_OTHER = 'Altro';
 
@@ -17,7 +18,15 @@ const MODES: Array<{ key: LogMode; label: string }> = [
 
 interface Props {
   open: boolean;
-  state: AppState;
+  // Pasti già registrati per il giorno in questione — oggi (state.meals) o
+  // un giorno precedente (fetch a parte) se si sta facendo un backfill.
+  mealsSource: Record<MealKey, { done: boolean; foods: string[] }>;
+  // Es. "Registra per venerdì 21 agosto" quando si registra un giorno
+  // precedente, altrimenti "Registra" (oggi, comportamento invariato).
+  sheetLabel: string;
+  // true quando si sta registrando un giorno precedente (backfill dal
+  // grafico "Andamento") invece di oggi — cambia solo una stringa di aiuto.
+  isBackfill: boolean;
   activeMeal: MealKey;
   onSelectMeal: (k: MealKey) => void;
   lockMeal: boolean;
@@ -38,7 +47,7 @@ interface Props {
 }
 
 export function LogSheet({
-  open, state, activeMeal, onSelectMeal, lockMeal, mode, onSelectMode,
+  open, mealsSource, sheetLabel, isBackfill, activeMeal, onSelectMeal, lockMeal, mode, onSelectMode,
   logText, onLogTextChange, hasTranscript, onTranscript,
   photoFoods, photoExtracting, photoError, onAddPhoto, onRetakePhoto, onUpdateFoods, onClose, onSubmit,
 }: Props) {
@@ -66,7 +75,7 @@ export function LogSheet({
   useEffect(() => {
     if (open) {
       api.getPlan().then(setPlanItems).catch(() => setPlanItems([]));
-      setEditedFoods(state.meals[activeMeal].done ? [...state.meals[activeMeal].foods] : null);
+      setEditedFoods(mealsSource[activeMeal].done ? [...mealsSource[activeMeal].foods] : null);
     } else {
       setShowSuggestions(false);
       setExpandedSuggestionCats(new Set());
@@ -85,7 +94,7 @@ export function LogSheet({
   const updateEditedFood = (i: number, value: string) =>
     setEditedFoods((f) => f?.map((x, idx) => (idx === i ? value : x)) ?? f);
   const removeEditedFood = (i: number) => setEditedFoods((f) => f?.filter((_, idx) => idx !== i) ?? f);
-  const foodsAreDirty = editedFoods !== null && JSON.stringify(editedFoods) !== JSON.stringify(state.meals[activeMeal].foods);
+  const foodsAreDirty = editedFoods !== null && JSON.stringify(editedFoods) !== JSON.stringify(mealsSource[activeMeal].foods);
   const saveEditedFoods = () => {
     if (editedFoods) onUpdateFoods(activeMeal, editedFoods.map((f) => f.trim()).filter(Boolean));
   };
@@ -151,17 +160,17 @@ export function LogSheet({
       <button className="nm-sheet-backdrop" onClick={onClose} aria-label="Chiudi" />
       <div className="nm-sheet">
         <div className="nm-sheet-handle" />
-        <div className="nm-sheet-label">Registra</div>
+        <div className="nm-sheet-label">{sheetLabel}</div>
 
         {lockMeal ? (
-          <div className="nm-sheet-meal-label">{state.meals[activeMeal].label}</div>
+          <div className="nm-sheet-meal-label">{MEAL_LABEL[activeMeal]}</div>
         ) : (
           <div className="nm-chip-row">
             {MEAL_ORDER.map((k) => {
               const on = activeMeal === k;
               return (
                 <button key={k} className={`nm-chip ${on ? 'is-on' : 'is-off'}`} onClick={() => onSelectMeal(k)}>
-                  {state.meals[k].label}
+                  {MEAL_LABEL[k]}
                 </button>
               );
             })}
@@ -170,7 +179,7 @@ export function LogSheet({
 
         {editedFoods !== null && (
           <div className="nm-logged-foods">
-            <div className="nm-hint">Già registrato oggi — modifica o rimuovi una voce, o aggiungi altro qui sotto (si somma):</div>
+            <div className="nm-hint">Già registrato{isBackfill ? '' : ' oggi'} — modifica o rimuovi una voce, o aggiungi altro qui sotto (si somma):</div>
             {editedFoods.map((food, i) => (
               <div key={i} className="nm-logged-food-row">
                 <input className="nm-text-input" value={food} onChange={(e) => updateEditedFood(i, e.target.value)} />

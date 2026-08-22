@@ -13,6 +13,19 @@ export interface MealState {
   // Saltato apposta per oggi (es. digiuno prolungato) — diverso da "non
   // ancora fatto": non conta nel denominatore del completamento giornaliero.
   skipped: boolean;
+  // Umore dopo il pasto, 1-5, 0 = non ancora valutato.
+  mood: number;
+}
+
+// Sottoinsieme di MealState per un giorno che non è oggi: senza label/
+// scoreLabel/tone (calcolati solo dentro buildState per lo stato del
+// giorno corrente) — usato per il backfill di un giorno precedente.
+export interface DayMealState {
+  done: boolean;
+  foods: string[];
+  time: string;
+  skipped: boolean;
+  mood: number;
 }
 
 export interface WeekDay {
@@ -91,6 +104,7 @@ export interface FoodVerdict {
 
 export interface LogSummary {
   key: MealKey;
+  date: string;
   label: string;
   foods: FoodVerdict[];
   score: { label: string; tone: Tone | 'none' };
@@ -100,6 +114,20 @@ export interface LogSummary {
 export interface LogResponse {
   state: AppState;
   summary: LogSummary;
+}
+
+export type HabitFrequency = 'daily' | 'weekly';
+
+export interface Habit {
+  id: number;
+  text: string;
+  frequency: HabitFrequency;
+  targetPerWeek: number;
+  // Orario abituale, facoltativo (es. "08:00") — stringa vuota se non impostato.
+  time: string;
+  // Spuntata oggi (finestra mobile 7 giorni per weekCount, non settimana solare).
+  doneToday: boolean;
+  weekCount: number;
 }
 
 export interface PatientListItem {

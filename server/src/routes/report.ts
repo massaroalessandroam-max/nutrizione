@@ -7,14 +7,15 @@ import { PLAN_CATEGORIES } from './plan.js';
 
 export const reportRouter = Router();
 
-async function loadPlanFoods(): Promise<string[]> {
-  const { rows } = await db.execute('SELECT name FROM nutrition_plan_items');
-  return (rows as any[]).map((r) => r.name as string);
-}
-
 async function loadPlanItemsWithCategory(): Promise<Array<{ name: string; category: string }>> {
   const { rows } = await db.execute('SELECT name, category FROM nutrition_plan_items');
   return (rows as any[]).map((r) => ({ name: r.name as string, category: (r.category as string) || 'Altro' }));
+}
+
+async function loadDivieti(): Promise<string[]> {
+  const { rows } = await db.execute('SELECT divieti FROM plan_notes WHERE id = 1');
+  const row = rows[0] as any;
+  return row ? JSON.parse(row.divieti) : [];
 }
 
 function shiftDate(iso: string, days: number): string {
@@ -147,7 +148,15 @@ reportRouter.get('/report', async (req, res) => {
     sql: 'SELECT date, meal_key, foods, time FROM meals WHERE done = 1 AND date >= ? AND date <= ? ORDER BY date, meal_key',
     args: [from, to],
   });
-  const planFoods = await loadPlanFoods();
+  const planItems = await loadPlanItemsWithCategory();
+  const planFoods = planItems.map((p) => p.name);
+  // 'Altro' è il fallback del loader per categoria non specificata: non è
+  // una vera macro-categoria condivisa, va escluso altrimenti alimenti
+  // scorrelati risulterebbero "della stessa categoria" per errore.
+  const planCategories = Object.fromEntries(
+    planItems.filter((p) => p.category && p.category !== 'Altro').map((p) => [p.name.toLowerCase(), p.category])
+  );
+  const divieti = await loadDivieti();
 
   const byDate = new Map<string, any[]>();
   for (const r of rows as any[]) {
@@ -164,7 +173,7 @@ reportRouter.get('/report', async (req, res) => {
     .map(([date, mealRows]) => {
       // Mese del giorno stesso (non quello di oggi), per la stagionalità
       // frutta/verdura corretta su un report che copre più mesi.
-      const ctx = { planFoods, month: Number(date.slice(5, 7)) };
+      const ctx = { planFoods, planCategories, divieti, month: Number(date.slice(5, 7)) };
       const meals = mealRows.map((r) => {
         const foods: string[] = JSON.parse(r.foods);
         const key = r.meal_key as MealKey;

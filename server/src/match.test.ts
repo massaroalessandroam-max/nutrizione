@@ -26,6 +26,14 @@ test('verdict: is case-insensitive and trims whitespace', () => {
   assert.equal(verdict('  YOGURT GRECO  ', JULY), 'good');
 });
 
+test('verdict: a divieto overrides even a plan match', () => {
+  // "Arachidi" è nel piano (di solito 'good'), ma un'allergia scoperta dopo
+  // deve poter vietarla comunque: il divieto vince sempre.
+  const v = verdictOf('Arachidi tostate', { planFoods: ['Arachidi tostate'], divieti: ['Arachidi'], month: 7 });
+  assert.equal(v.tone, 'bad');
+  assert.equal(v.reason, 'divieto');
+});
+
 test('verdict: a food from the patient\'s own Nemis plan wins over the generic lists', () => {
   // "Pizza" sarebbe normalmente 'bad' (lista SCONSIGLIATI), ma se è nel
   // piano del paziente ha priorità.
@@ -80,6 +88,30 @@ test('score: two or more bad foods -> Da rivedere', () => {
 test('score: exactly one bad food and no good foods -> Nel complesso ok', () => {
   const s = score(['Pizza'], JULY);
   assert.deepEqual(s, { label: 'Nel complesso ok', tone: 'ok' });
+});
+
+test('score: several plan foods all in the same category -> not Buona scelta even if each is individually good', () => {
+  // Riso, pane e pasta sono tutti Carboidrati nel piano: presi da soli sono
+  // ciascuno "consigliato dal piano" (good), ma il pasto nel complesso non
+  // è bilanciato.
+  const ctx = {
+    planFoods: ['Riso', 'Pane', 'Pasta'],
+    planCategories: { riso: 'Carboidrati', pane: 'Carboidrati', pasta: 'Carboidrati' },
+    month: 7,
+  };
+  const s = score(['Riso', 'Pane', 'Pasta'], ctx);
+  assert.equal(s.tone, 'ok');
+  assert.notEqual(s.label, 'Buona scelta');
+});
+
+test('score: plan foods from different categories -> still Buona scelta', () => {
+  const ctx = {
+    planFoods: ['Riso', 'Pollo', 'Zucchine'],
+    planCategories: { riso: 'Carboidrati', pollo: 'Proteine', zucchine: 'Verdura' },
+    month: 7,
+  };
+  const s = score(['Riso', 'Pollo', 'Zucchine'], ctx);
+  assert.deepEqual(s, { label: 'Buona scelta', tone: 'good' });
 });
 
 test('pointsForFoods: sums per-food points by verdict (good=15, ok=8, bad=3)', () => {
