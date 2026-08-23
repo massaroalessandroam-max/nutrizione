@@ -13,7 +13,11 @@ import { SummaryOverlay } from './components/sheet/SummaryOverlay';
 import { SupplementSheet } from './components/sheet/SupplementSheet';
 import { formatDateLabel } from './lib/mealMeta';
 
-function App() {
+interface Props {
+  onLogout: () => void;
+}
+
+function App({ onLogout }: Props) {
   const d = useDiario();
   const mealsSource = d.backfillDate ? d.backfillMeals : d.appState?.meals ?? null;
   const sheetLabel = d.backfillDate ? `Registra per ${formatDateLabel(d.backfillDate).toLowerCase()}` : 'Registra';
@@ -43,6 +47,7 @@ function App() {
                   onDeleteMeal={d.deleteMeal}
                   onSkipMeal={d.skipMeal}
                   onOpenSupplements={d.openSupplementSheet}
+                  onLogout={onLogout}
                 />
               )}
               {d.tab === 'abitudini' && <AbitudiniView />}

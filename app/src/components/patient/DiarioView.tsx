@@ -1,7 +1,7 @@
 import type { AppState, MealKey } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { RingSvg } from '../RingSvg';
-import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon, PillIcon } from '../../icons';
+import { FlameIcon, CheckCircleIcon, PlusIcon, ClockIcon, TrashIcon, MinusCircleIcon, UndoIcon, MealIcon, PillIcon, LogoutIcon } from '../../icons';
 import { badgeClass } from '../../lib/tone';
 import { formatDateLabel, MOOD_EMOJI } from '../../lib/mealMeta';
 import { useNow } from '../../hooks/useNow';
@@ -15,9 +15,10 @@ interface Props {
   onDeleteMeal: (key: MealKey) => void;
   onSkipMeal: (key: MealKey, skipped: boolean) => void;
   onOpenSupplements: () => void;
+  onLogout: () => void;
 }
 
-export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fastToggling, onDeleteMeal, onSkipMeal, onOpenSupplements }: Props) {
+export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fastToggling, onDeleteMeal, onSkipMeal, onOpenSupplements, onLogout }: Props) {
   const now = useNow(state.fastActive);
   const elapsedMs = Math.max(0, now - state.fastStart);
   const h = Math.floor(elapsedMs / 3600000);
@@ -57,6 +58,9 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
             <CheckCircleIcon />
             <span>{state.points}</span>
           </div>
+          <button className="nm-icon-btn" onClick={onLogout} aria-label="Esci">
+            <LogoutIcon size={16} color="var(--ink-soft)" />
+          </button>
         </div>
       </div>
 

@@ -39,7 +39,7 @@ function Root() {
     return <NutritionistApp onLogout={() => setSession('none')} />;
   }
 
-  return <App />;
+  return <App onLogout={() => { authStorage.clearPatientToken(); setSession('none'); }} />;
 }
 
 export default Root;
