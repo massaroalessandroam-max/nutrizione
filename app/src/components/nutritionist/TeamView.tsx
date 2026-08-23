@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { NutritionistTeamMember } from '../../types';
 import { BackArrowIcon } from '../../icons';
+import { ShareActions } from '../ShareActions';
 
 interface Props {
   onBack: () => void;
@@ -40,6 +41,10 @@ export function TeamView({ onBack, onGenerateInvite }: Props) {
           <div style={{ fontWeight: 600 }}>Invito</div>
           <div className="nm-page-sub" style={{ marginTop: 2 }}>Condividilo fuori banda — non sarà più visibile dopo.</div>
           <div className="nm-text-input" style={{ marginTop: 8, fontWeight: 700, wordBreak: 'break-all' }}>{inviteToken}</div>
+          <ShareActions
+            text={`Ecco il tuo invito per registrarti come nutrizionista su Diario Nemis: ${inviteToken}`}
+            emailSubject="Il tuo invito Diario Nemis"
+          />
           <button className="nm-modal-btn nm-modal-btn-secondary" style={{ marginTop: 8 }} onClick={() => setInviteToken(null)}>Fatto</button>
         </div>
       )}
@@ -49,6 +54,10 @@ export function TeamView({ onBack, onGenerateInvite }: Props) {
           <div style={{ fontWeight: 600 }}>Password temporanea per {reset.name}</div>
           <div className="nm-page-sub" style={{ marginTop: 2 }}>La vecchia non funziona più. Condividila fuori banda — non sarà più visibile dopo.</div>
           <div className="nm-text-input" style={{ marginTop: 8, fontWeight: 700, letterSpacing: 1, textAlign: 'center' }}>{reset.password}</div>
+          <ShareActions
+            text={`Ciao ${reset.name}, ecco la tua nuova password temporanea per Diario Nemis: ${reset.password}`}
+            emailSubject="La tua nuova password Diario Nemis"
+          />
           <button className="nm-modal-btn nm-modal-btn-secondary" style={{ marginTop: 8 }} onClick={() => setReset(null)}>Fatto</button>
         </div>
       )}

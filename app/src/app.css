@@ -28,29 +28,6 @@
   }
 }
 
-/* ===== Role switch ===== */
-.nm-roleswitch {
-  display: flex;
-  gap: 6px;
-  padding: 14px 16px 10px;
-  background: var(--app-surface);
-}
-.nm-role-btn {
-  flex: 1;
-  padding: 9px;
-  border-radius: 11px;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  background: rgba(11, 59, 74, .06);
-  color: var(--ink-soft);
-}
-.nm-role-btn.is-active {
-  background: var(--teal-900);
-  color: #fff;
-}
-
 .nm-patient-body { padding-bottom: 88px; }
 .nm-section { padding: 6px 20px 20px; }
 
@@ -276,6 +253,14 @@
 .nm-report-adherence { display: flex; justify-content: space-between; padding: 11px 0 3px; font-size: 13px; }
 .nm-report-adherence span:first-child { color: var(--ink-soft); }
 .nm-report-adherence span:last-child { font-weight: 700; color: var(--teal-700); }
+
+.nm-share-row { display: flex; gap: 8px; margin-top: 8px; }
+.nm-share-btn {
+  flex: 1; background: var(--card); border: 1.5px solid var(--line-medium); color: var(--ink);
+  border-radius: 12px; padding: 9px 0; font-weight: 600; font-size: 12.5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;
+}
+.nm-share-btn.is-whatsapp { background: var(--whatsapp); border-color: var(--whatsapp); color: #fff; }
 
 .nm-report-actions { display: flex; gap: 11px; }
 .nm-btn-outline {
@@ -684,8 +669,39 @@
 .nm-modal-btn-primary { background: var(--teal-700); color: #fff; }
 @keyframes nm-spin { to { transform: rotate(360deg); } }
 
-/* ===== Nutritionist ===== */
-.nm-nutri-body { padding: 6px 20px 24px; min-height: 820px; }
+/* ===== Nutritionist =====
+   Su mobile: una schermata alla volta (lista O dettaglio), come il resto
+   dell'app — .is-detail-active decide quale. Da 900px in su (uso da
+   desktop) diventa un vero layout a due colonne, lista+dettaglio sempre
+   affiancati: la classe .is-detail-active smette di avere effetto perché
+   la media query sotto forza entrambi i pannelli visibili. */
+.nm-nutri-body { padding: 6px 20px 24px; }
+
+.nm-nutri-page { align-items: stretch; }
+.nm-nutri-shell {
+  width: 100%; min-height: 100vh; display: flex; flex-direction: column; background: var(--app-surface);
+}
+.nm-nutri-sidebar { width: 100%; display: flex; flex-direction: column; min-height: 100vh; }
+.nm-nutri-sidebar .nm-nutri-body { flex: 1; }
+.nm-nutri-logout { flex: none; margin: 0 20px 24px; }
+.nm-nutri-main { display: none; width: 100%; flex-direction: column; }
+.nm-nutri-shell.is-detail-active .nm-nutri-sidebar { display: none; }
+.nm-nutri-shell.is-detail-active .nm-nutri-main { display: flex; }
+
+@media (min-width: 900px) {
+  .nm-nutri-page { padding: 28px; justify-content: center; align-items: flex-start; }
+  .nm-nutri-shell {
+    flex-direction: row; max-width: 1180px; min-height: 760px;
+    border-radius: 24px; box-shadow: var(--shadow-shell); overflow: hidden;
+  }
+  .nm-nutri-sidebar {
+    display: flex !important; width: 380px; flex: none;
+    border-right: 1px solid var(--line-soft); max-height: 100vh; overflow-y: auto;
+  }
+  .nm-nutri-main { display: flex !important; flex: 1; max-height: 100vh; overflow-y: auto; }
+  .nm-nutri-main .nm-nutri-body { max-width: 720px; margin: 0 auto; width: 100%; }
+  .nm-nutri-main .nm-back-btn { display: none; }
+}
 .nm-nutri-stats { display: flex; gap: 9px; margin-bottom: 16px; }
 .nm-nutri-stat {
   flex: 1; border-radius: 16px; padding: 14px;
@@ -700,6 +716,7 @@
   display: flex; align-items: center; gap: 13px; background: var(--card); border: 1px solid var(--line-soft);
   border-radius: 16px; padding: 13px 15px; cursor: pointer; text-align: left; width: 100%;
 }
+.nm-patient-row.is-active { border-color: var(--teal-700); background: var(--good-bg); }
 .nm-avatar {
   width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center;
   justify-content: center; font-weight: 700; font-size: 15px; flex: none;

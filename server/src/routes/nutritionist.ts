@@ -18,9 +18,15 @@ async function getPatientRow(id: number): Promise<PatientRow | undefined> {
 }
 
 // Pool condiviso: qualunque nutrizionista dello studio vede tutti i
-// pazienti, non solo quelli che ha creato lui.
+// pazienti, non solo quelli che ha creato lui. Ordine di default pensato
+// per il triage: prima chi ha uno scambio di messaggi aperto (c'è
+// probabilmente qualcosa da seguire), poi per aderenza crescente — così chi
+// segue meno il piano si vede subito, senza dover ordinare a mano.
 nutritionistRouter.get('/patients', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, name, next_visit_at, next_visit_note FROM patients ORDER BY name');
+  const { rows } = await db.execute('SELECT id, name, next_visit_at, next_visit_note FROM patients');
+  const { rows: messageCounts } = await db.execute('SELECT patient_id, COUNT(*) as n FROM messages GROUP BY patient_id');
+  const patientsWithMessages = new Set((messageCounts as any[]).map((r) => r.patient_id as number));
+
   const list = await Promise.all((rows as unknown as PatientRow[]).map(async (p) => {
     const state = await buildState(p.id);
     return {
@@ -32,8 +38,11 @@ nutritionistRouter.get('/patients', async (_req, res) => {
       points: state.points,
       nextVisitAt: p.next_visit_at,
       nextVisitNote: p.next_visit_note,
+      hasMessages: patientsWithMessages.has(p.id),
     };
   }));
+
+  list.sort((a, b) => (Number(b.hasMessages) - Number(a.hasMessages)) || (a.adherencePct - b.adherencePct));
   res.json(list);
 });
 

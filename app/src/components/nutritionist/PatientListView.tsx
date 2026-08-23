@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import type { NutritionistPatientListItem } from '../../types';
 import { PlusIcon } from '../../icons';
+import { ShareActions } from '../ShareActions';
 
 interface Props {
   patients: NutritionistPatientListItem[] | null;
+  // Solo per evidenziare la riga nella sidebar da desktop, dove lista e
+  // dettaglio sono affiancati — su mobile la lista sparisce quando c'è un
+  // dettaglio attivo, quindi lì non serve.
+  activePatientId: number | null;
   onSelect: (id: number) => void;
   onCreatePatient: (name: string) => Promise<{ id: number; name: string; accessCode: string }>;
   onOpenTeam: () => void;
 }
 
-export function PatientListView({ patients, onSelect, onCreatePatient, onOpenTeam }: Props) {
+export function PatientListView({ patients, activePatientId, onSelect, onCreatePatient, onOpenTeam }: Props) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [createdCode, setCreatedCode] = useState<{ name: string; code: string } | null>(null);
+  const [query, setQuery] = useState('');
 
   const submitNewPatient = async () => {
     const name = newName.trim();
@@ -26,6 +32,10 @@ export function PatientListView({ patients, onSelect, onCreatePatient, onOpenTea
   const avgAdherence = patients?.length
     ? Math.round(patients.reduce((s, p) => s + p.adherencePct, 0) / patients.length)
     : 0;
+
+  const filteredPatients = query.trim()
+    ? patients?.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : patients;
 
   return (
     <div>
@@ -48,9 +58,21 @@ export function PatientListView({ patients, onSelect, onCreatePatient, onOpenTea
           <div style={{ fontWeight: 600 }}>Codice per {createdCode.name}</div>
           <div className="nm-page-sub" style={{ marginTop: 2 }}>Condividilo col paziente — non sarà più visibile dopo.</div>
           <div className="nm-text-input" style={{ marginTop: 8, fontWeight: 700, letterSpacing: 2, textAlign: 'center' }}>{createdCode.code}</div>
+          <ShareActions
+            text={`Ciao ${createdCode.name}, ecco il tuo codice per accedere a Diario Nemis: ${createdCode.code}`}
+            emailSubject="Il tuo codice Diario Nemis"
+          />
           <button className="nm-modal-btn nm-modal-btn-secondary" style={{ marginTop: 8 }} onClick={() => setCreatedCode(null)}>Fatto</button>
         </div>
       )}
+
+      <input
+        className="nm-text-input"
+        style={{ marginTop: 14 }}
+        placeholder="Cerca un paziente…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
 
       {adding ? (
         <div className="nm-plan-item-card" style={{ marginTop: 14 }}>
@@ -74,8 +96,11 @@ export function PatientListView({ patients, onSelect, onCreatePatient, onOpenTea
       <div className="nm-patient-list" style={{ marginTop: 14 }}>
         {patients === null && <div className="nm-empty-state">Caricamento…</div>}
         {patients?.length === 0 && <div className="nm-empty-state">Nessun paziente ancora — aggiungine uno.</div>}
-        {patients?.map((p) => (
-          <button key={p.id} className="nm-patient-row" onClick={() => onSelect(p.id)}>
+        {patients && patients.length > 0 && filteredPatients?.length === 0 && (
+          <div className="nm-empty-state">Nessun paziente trovato per «{query.trim()}».</div>
+        )}
+        {filteredPatients?.map((p) => (
+          <button key={p.id} className={`nm-patient-row ${p.id === activePatientId ? 'is-active' : ''}`} onClick={() => onSelect(p.id)}>
             <div className="nm-avatar" style={{ background: 'var(--neutral-chip)', color: 'var(--ink-soft)' }}>
               {p.name.slice(0, 2).toUpperCase()}
             </div>

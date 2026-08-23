@@ -5,6 +5,7 @@ import { badgeClass } from '../../lib/tone';
 import { MEAL_LABEL, MOOD_EMOJI, formatDateLabel } from '../../lib/mealMeta';
 import { BackArrowIcon } from '../../icons';
 import { api, type Report } from '../../api';
+import { ShareActions } from '../ShareActions';
 
 type Tab = 'diario' | 'andamento' | 'abitudini' | 'piano' | 'report' | 'messaggi';
 
@@ -99,6 +100,10 @@ export function PatientDetailView({ patient, messages, onBack, onSetNextVisit, o
           <div style={{ fontWeight: 600 }}>Nuovo codice per {patient.name}</div>
           <div className="nm-page-sub" style={{ marginTop: 2 }}>Il vecchio non funziona più. Condividilo — non sarà più visibile dopo.</div>
           <div className="nm-text-input" style={{ marginTop: 8, fontWeight: 700, letterSpacing: 2, textAlign: 'center' }}>{newCode}</div>
+          <ShareActions
+            text={`Ciao ${patient.name}, ecco il tuo nuovo codice per accedere a Diario Nemis: ${newCode}`}
+            emailSubject="Il tuo nuovo codice Diario Nemis"
+          />
           <button className="nm-modal-btn nm-modal-btn-secondary" style={{ marginTop: 8 }} onClick={() => setNewCode(null)}>Fatto</button>
         </div>
       )}

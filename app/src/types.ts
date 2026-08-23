@@ -142,6 +142,9 @@ export interface NutritionistPatientListItem {
   points: number;
   nextVisitAt: string;
   nextVisitNote: string;
+  // C'è almeno un messaggio nel thread — usato solo per l'ordine di
+  // default della lista (chi ha uno scambio aperto viene prima).
+  hasMessages: boolean;
 }
 
 export interface NutritionistPatientDetail {
