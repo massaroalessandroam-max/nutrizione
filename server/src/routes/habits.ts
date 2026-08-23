@@ -2,43 +2,50 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { todayStr } from '../time.js';
 import { requirePatient } from '../auth.js';
+import { computeHabitsWeek } from '../stats.js';
 
 export const habitsRouter = Router();
 habitsRouter.use(requirePatient);
 
-export const HABIT_FREQUENCIES = ['daily', 'weekly'] as const;
-export type HabitFrequency = (typeof HABIT_FREQUENCIES)[number];
+// Ordine "italiano" della settimana (lunedì primo) usato per i giorni scelti
+// su ogni abitudine. getUTCDay() di JS parte dalla domenica: WEEKDAY_INDEX
+// mappa un codice al suo indice getUTCDay() per confrontarlo con una data.
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+const WEEKDAY_INDEX: Record<Weekday, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
-interface HabitRow { id: number; text: string; frequency: string; target_per_week: number; time: string }
+export function weekdayCodeOf(date: string): Weekday {
+  const jsDay = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return WEEKDAYS.find((w) => WEEKDAY_INDEX[w] === jsDay)!;
+}
 
-// weekCount è la finestra mobile degli ultimi 7 giorni (oggi compreso), non
-// la settimana solare — stessa convenzione già usata per il tetto
-// settimanale degli alimenti del piano (loadWeekFoods in state.ts).
+interface HabitRow { id: number; text: string; time: string; days: string }
+
 export async function loadHabits(patientId: number) {
-  const { rows } = await db.execute({ sql: 'SELECT id, text, frequency, target_per_week, time FROM habits WHERE patient_id = ? ORDER BY idx', args: [patientId] });
+  const { rows } = await db.execute({ sql: 'SELECT id, text, time, days FROM habits WHERE patient_id = ? ORDER BY idx', args: [patientId] });
   const habits = rows as unknown as HabitRow[];
   const date = todayStr();
+  const todayCode = weekdayCodeOf(date);
   const habitIds = habits.map((h) => h.id);
-  const checks: Array<{ habit_id: number; date: string }> = [];
+  const doneToday = new Set<number>();
   if (habitIds.length) {
     const placeholders = habitIds.map(() => '?').join(',');
     const { rows: checkRows } = await db.execute({
-      sql: `SELECT habit_id, date FROM habit_checks WHERE done = 1 AND date >= date(?, '-6 days') AND date <= ? AND habit_id IN (${placeholders})`,
-      args: [date, date, ...habitIds],
+      sql: `SELECT habit_id FROM habit_checks WHERE done = 1 AND date = ? AND habit_id IN (${placeholders})`,
+      args: [date, ...habitIds],
     });
-    checks.push(...(checkRows as unknown as Array<{ habit_id: number; date: string }>));
+    for (const r of checkRows as unknown as Array<{ habit_id: number }>) doneToday.add(r.habit_id);
   }
 
   return habits.map((h) => {
-    const weekChecks = checks.filter((c) => c.habit_id === h.id);
+    const days = h.days ? (h.days.split(',') as Weekday[]) : [];
     return {
       id: h.id,
       text: h.text,
-      frequency: h.frequency,
-      targetPerWeek: h.target_per_week,
       time: h.time,
-      doneToday: weekChecks.some((c) => c.date === date),
-      weekCount: weekChecks.length,
+      days,
+      dueToday: days.length === 0 || days.includes(todayCode),
+      doneToday: doneToday.has(h.id),
     };
   });
 }
@@ -47,7 +54,11 @@ habitsRouter.get('/habits', async (req, res) => {
   res.json(await loadHabits(req.patientId!));
 });
 
-interface HabitItemBody { id?: unknown; text?: unknown; frequency?: unknown; targetPerWeek?: unknown; time?: unknown }
+habitsRouter.get('/habits/week', async (req, res) => {
+  res.json(await computeHabitsWeek(req.patientId!, todayStr()));
+});
+
+interface HabitItemBody { id?: unknown; text?: unknown; days?: unknown; time?: unknown }
 
 // Salvataggio in blocco come /plan e /supplements/custom, ma preservando
 // l'id: gli item con id vengono aggiornati sul posto, quelli senza sono
@@ -58,24 +69,24 @@ export async function saveHabitsList(patientId: number, input: HabitItemBody[]) 
     .map((it) => ({
       id: typeof it?.id === 'number' ? it.id : undefined,
       text: String(it?.text ?? '').trim(),
-      frequency: (HABIT_FREQUENCIES as readonly string[]).includes(String(it?.frequency)) ? String(it.frequency) : 'daily',
-      targetPerWeek: Math.min(7, Math.max(1, Number(it?.targetPerWeek) || 7)),
+      days: Array.isArray(it?.days) ? it.days.filter((d): d is Weekday => (WEEKDAYS as readonly string[]).includes(String(d))) : [],
       time: /^\d{2}:\d{2}$/.test(String(it?.time)) ? String(it.time) : '',
     }))
     .filter((it) => it.text);
 
   const keepIds: number[] = [];
   for (const [idx, it] of clean.entries()) {
+    const daysCsv = it.days.join(',');
     if (it.id !== undefined) {
       await db.execute({
-        sql: 'UPDATE habits SET idx = ?, text = ?, frequency = ?, target_per_week = ?, time = ? WHERE id = ? AND patient_id = ?',
-        args: [idx, it.text, it.frequency, it.targetPerWeek, it.time, it.id, patientId],
+        sql: 'UPDATE habits SET idx = ?, text = ?, time = ?, days = ? WHERE id = ? AND patient_id = ?',
+        args: [idx, it.text, it.time, daysCsv, it.id, patientId],
       });
       keepIds.push(it.id);
     } else {
       const r = await db.execute({
-        sql: 'INSERT INTO habits (patient_id, idx, text, frequency, target_per_week, time) VALUES (?, ?, ?, ?, ?, ?)',
-        args: [patientId, idx, it.text, it.frequency, it.targetPerWeek, it.time],
+        sql: 'INSERT INTO habits (patient_id, idx, text, time, days) VALUES (?, ?, ?, ?, ?)',
+        args: [patientId, idx, it.text, it.time, daysCsv],
       });
       keepIds.push(Number(r.lastInsertRowid));
     }

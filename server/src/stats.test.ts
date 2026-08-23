@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 process.env.DB_PATH = ':memory:';
 
 const { db, initDb } = await import('./db.js');
-const { computeStreak, computeWeek } = await import('./stats.js');
+const { computeStreak, computeWeek, computeHabitsWeek } = await import('./stats.js');
 
 await initDb();
 
@@ -78,4 +78,32 @@ test('computeWeek: returns 7 days ending today, with real doneCount per day', as
   assert.equal(week[6].isToday, true);
   assert.equal(week[6].doneCount, 1);
   assert.equal(week[5].doneCount, 2);
+});
+
+test('computeHabitsWeek: duePct riflette solo le abitudini dovute quel giorno, giorno per giorno', async () => {
+  await db.execute('DELETE FROM habits');
+  await db.execute('DELETE FROM habit_checks');
+
+  // 2026-08-17 = lunedì, 2026-08-18 = martedì.
+  const monday = '2026-08-17';
+  const tuesday = '2026-08-18';
+
+  const daily = await db.execute({ sql: "INSERT INTO habits (patient_id, idx, text, time, days) VALUES (1, 0, 'Ogni giorno', '', '')" });
+  const mondayOnly = await db.execute({ sql: "INSERT INTO habits (patient_id, idx, text, time, days) VALUES (1, 1, 'Solo lunedì', '', 'mon')" });
+  const dailyId = Number(daily.lastInsertRowid);
+  const mondayOnlyId = Number(mondayOnly.lastInsertRowid);
+
+  await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [dailyId, monday] });
+  await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [mondayOnlyId, monday] });
+  await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [dailyId, tuesday] });
+
+  const week = await computeHabitsWeek(1, tuesday);
+  const mondayEntry = week.find((d) => d.date === monday)!;
+  const tuesdayEntry = week.find((d) => d.date === tuesday)!;
+
+  assert.equal(mondayEntry.dueCount, 2, 'lunedì entrambe le abitudini sono dovute');
+  assert.equal(mondayEntry.duePct, 100);
+  assert.equal(tuesdayEntry.dueCount, 1, 'martedì "Solo lunedì" non è dovuta');
+  assert.equal(tuesdayEntry.doneCount, 1);
+  assert.equal(tuesdayEntry.duePct, 100);
 });

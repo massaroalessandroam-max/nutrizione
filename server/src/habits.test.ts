@@ -14,12 +14,12 @@ test('saveHabitsList: adding a new item preserves the existing id and its check 
   await db.execute('DELETE FROM habits');
   await db.execute('DELETE FROM habit_checks');
 
-  const [acqua] = await saveHabitsList(PATIENT, [{ text: 'Bere acqua', frequency: 'daily', targetPerWeek: 7 }]);
+  const [acqua] = await saveHabitsList(PATIENT, [{ text: 'Bere acqua', days: [] }]);
   await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [acqua.id, '2026-08-20'] });
 
   const withNew = await saveHabitsList(PATIENT, [
-    { id: acqua.id, text: 'Bere acqua', frequency: 'daily', targetPerWeek: 7 },
-    { text: 'Camminare', frequency: 'weekly', targetPerWeek: 3 },
+    { id: acqua.id, text: 'Bere acqua', days: [] },
+    { text: 'Camminare', days: ['mon', 'wed', 'fri'] },
   ]);
 
   assert.equal(withNew.length, 2);
@@ -33,7 +33,7 @@ test('saveHabitsList: removing an item deletes its habit_checks too', async () =
   await db.execute('DELETE FROM habits');
   await db.execute('DELETE FROM habit_checks');
 
-  const [h] = await saveHabitsList(PATIENT, [{ text: 'Stretching', frequency: 'daily', targetPerWeek: 7 }]);
+  const [h] = await saveHabitsList(PATIENT, [{ text: 'Stretching', days: [] }]);
   await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [h.id, '2026-08-20'] });
 
   const after = await saveHabitsList(PATIENT, []);
@@ -42,25 +42,38 @@ test('saveHabitsList: removing an item deletes its habit_checks too', async () =
   assert.equal(rows.length, 0, 'le spunte orfane vanno cancellate insieme all\'abitudine');
 });
 
-test('loadHabits: weekCount uses a rolling 7-day window, doneToday reflects today only', async () => {
+test('saveHabitsList: days vuoto = tutti i giorni, altrimenti dueToday segue i giorni scelti', async () => {
   await db.execute('DELETE FROM habits');
   await db.execute('DELETE FROM habit_checks');
 
-  const [h] = await saveHabitsList(PATIENT, [{ text: 'Palestra', frequency: 'weekly', targetPerWeek: 3 }]);
+  await saveHabitsList(PATIENT, [{ text: 'Ogni giorno', days: [] }, { text: 'Solo lunedì', days: ['mon'] }]);
+  const habits = await loadHabits(PATIENT);
+  const daily = habits.find((h) => h.text === 'Ogni giorno')!;
+  const mondayOnly = habits.find((h) => h.text === 'Solo lunedì')!;
+
+  assert.equal(daily.dueToday, true, 'nessun giorno impostato = dovuta ogni giorno');
+  const todayIsMonday = new Date().getUTCDay() === 1;
+  assert.equal(mondayOnly.dueToday, todayIsMonday);
+});
+
+test('loadHabits: doneToday riflette la spunta di oggi', async () => {
+  await db.execute('DELETE FROM habits');
+  await db.execute('DELETE FROM habit_checks');
+
+  const [h] = await saveHabitsList(PATIENT, [{ text: 'Palestra', days: [] }]);
   const today = new Date().toISOString().slice(0, 10);
   await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [h.id, today] });
 
   const [loaded] = await loadHabits(PATIENT);
   assert.equal(loaded.doneToday, true);
-  assert.equal(loaded.weekCount, 1);
 });
 
 test('loadHabits: scoped per patient, one patient does not see another\'s habits', async () => {
   await db.execute('DELETE FROM habits');
   await db.execute('DELETE FROM habit_checks');
 
-  await saveHabitsList(PATIENT, [{ text: 'Del paziente 1', frequency: 'daily', targetPerWeek: 7 }]);
-  await saveHabitsList(2, [{ text: 'Del paziente 2', frequency: 'daily', targetPerWeek: 7 }]);
+  await saveHabitsList(PATIENT, [{ text: 'Del paziente 1', days: [] }]);
+  await saveHabitsList(2, [{ text: 'Del paziente 2', days: [] }]);
 
   const habitsOfPatient1 = await loadHabits(PATIENT);
   assert.equal(habitsOfPatient1.length, 1);

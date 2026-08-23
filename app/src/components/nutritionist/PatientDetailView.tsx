@@ -3,6 +3,7 @@ import type { NutritionistPatientDetail, Message } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { badgeClass } from '../../lib/tone';
 import { MEAL_LABEL, MOOD_EMOJI, formatDateLabel } from '../../lib/mealMeta';
+import { DAY_LABEL } from '../../lib/habitMeta';
 import { BackArrowIcon } from '../../icons';
 import { api, type Report } from '../../api';
 import { ShareActions } from '../ShareActions';
@@ -214,7 +215,7 @@ export function PatientDetailView({ patient, messages, onBack, onSetNextVisit, o
               <span style={{ flex: 1 }}>{h.text}</span>
               {h.time && <span className="nm-habit-time">{h.time}</span>}
               <span className="nm-habit-progress">
-                {h.frequency === 'weekly' ? `${h.weekCount}/${h.targetPerWeek}` : h.doneToday ? 'Fatta oggi' : '—'}
+                {h.days.length === 0 ? 'Ogni giorno' : h.days.map((d) => DAY_LABEL[d]).join(' ')}
               </span>
             </div>
           ))}

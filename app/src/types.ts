@@ -121,18 +121,28 @@ export interface LogResponse {
   summary: LogSummary;
 }
 
-export type HabitFrequency = 'daily' | 'weekly';
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export interface Habit {
   id: number;
   text: string;
-  frequency: HabitFrequency;
-  targetPerWeek: number;
+  // Giorni della settimana in cui è dovuta; array vuoto = tutti i giorni.
+  days: Weekday[];
   // Orario abituale, facoltativo (es. "08:00") — stringa vuota se non impostato.
   time: string;
-  // Spuntata oggi (finestra mobile 7 giorni per weekCount, non settimana solare).
+  // Oggi è uno dei giorni scelti (o days è vuoto = tutti i giorni).
+  dueToday: boolean;
+  // Spuntata oggi.
   doneToday: boolean;
-  weekCount: number;
+}
+
+export interface HabitWeekDay {
+  date: string;
+  dayLabel: string;
+  isToday: boolean;
+  dueCount: number;
+  doneCount: number;
+  duePct: number;
 }
 
 export interface NutritionistPatientListItem {

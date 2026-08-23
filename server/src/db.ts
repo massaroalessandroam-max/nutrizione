@@ -257,7 +257,8 @@ export async function initDb(): Promise<void> {
   `);
   await addPatientIdColumn('report_send_log');
 
-  // Abitudini da spuntare, giornaliere o settimanali ("N volte a settimana").
+  // Abitudini da spuntare. "days" = giorni della settimana in cui è dovuta
+  // (CSV di codici 'mon'..'sun'), stringa vuota = tutti i giorni.
   // id già globale (AUTOINCREMENT): basta patient_id in più. habit_checks
   // referenzia habit_id (già globale), non serve patient_id lì.
   await db.execute(`
@@ -271,6 +272,14 @@ export async function initDb(): Promise<void> {
     );
   `);
   await addPatientIdColumn('habits');
+  // Sostituisce frequency/target_per_week (mai stati un buon modello: "3x a
+  // settimana" senza dire quali giorni) — stesso pattern try/catch delle
+  // altre colonne aggiunte dopo la creazione della tabella.
+  try {
+    await db.execute("ALTER TABLE habits ADD COLUMN days TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // colonna già presente
+  }
   // Una spunta per abitudine/giorno. Il conteggio settimanale è a finestra
   // mobile di 7 giorni (stessa convenzione di loadWeekFoods per il piano),
   // non settimana solare.

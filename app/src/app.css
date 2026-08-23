@@ -524,9 +524,8 @@
   flex: none; width: 78px; border: none; background: none; color: var(--ink-faint); font-size: 12.5px; padding: 3px 2px;
 }
 .nm-habit-time:focus { outline: none; background: var(--neutral-chip); border-radius: 6px; }
-.nm-habit-freq {
-  flex: none; border: none; background: none; color: var(--ink-faint); font-size: 12.5px; padding: 3px 2px; cursor: pointer;
-}
+.nm-habit-text-static { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; padding: 3px 2px; }
+.nm-habit-time-static { flex: none; font-size: 12.5px; color: var(--ink-faint); padding: 3px 2px; }
 .nm-habit-progress { flex: none; font-size: 11.5px; font-weight: 600; color: var(--teal-700); white-space: nowrap; }
 .nm-habit-delete {
   flex: none; border: none; background: none; color: var(--ink-faint); cursor: pointer; padding: 2px;
@@ -543,6 +542,27 @@
   display: flex; align-items: center; gap: 6px; padding: 9px 4px;
 }
 .nm-habit-add-trigger:hover { color: var(--ink); }
+
+.nm-habit-edit-row { padding: 10px 4px; border-bottom: 1px solid var(--line-soft); }
+.nm-habit-edit-row:last-child { border-bottom: none; }
+.nm-habit-edit-top { display: flex; align-items: center; gap: 8px; }
+.nm-habit-edit-bottom { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding-left: 2px; }
+.nm-habit-days { display: flex; gap: 4px; }
+.nm-habit-day {
+  flex: none; width: 26px; height: 26px; border-radius: 999px; border: 1.5px solid var(--line-medium);
+  background: var(--card); color: var(--ink-soft); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0;
+}
+.nm-habit-day.is-on { background: var(--teal-700); border-color: var(--teal-700); color: #fff; }
+
+.nm-habit-manage-btn {
+  width: 100%; background: var(--card); border: 1.5px solid var(--teal-700); color: var(--teal-900);
+  border-radius: 14px; padding: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 14px;
+}
+.nm-habit-tomorrow-btn {
+  width: 100%; background: none; border: 1.5px dashed var(--line-strong); color: var(--ink-soft);
+  border-radius: 14px; padding: 12px; font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 14px;
+}
 
 .nm-onboard-add-btn {
   margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;

@@ -163,6 +163,15 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
         })}
       </div>
 
+      <button className="nm-cta" onClick={onOpenLogQuick}>
+        <PlusIcon size={19} color="#fff" />
+        Registra un pasto
+      </button>
+      <button className="nm-cta-secondary" onClick={onOpenSupplements}>
+        <PillIcon size={15} />
+        Integratori
+      </button>
+
       {state.fastActive ? (
         <button className="nm-fast-mini" onClick={onToggleFast} disabled={fastToggling}>
           <ClockIcon size={15} color="var(--teal-700)" />
@@ -178,15 +187,6 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
           Inizia digiuno
         </button>
       )}
-
-      <button className="nm-cta" onClick={onOpenLogQuick}>
-        <PlusIcon size={19} color="#fff" />
-        Registra un pasto
-      </button>
-      <button className="nm-cta-secondary" onClick={onOpenSupplements}>
-        <PillIcon size={15} />
-        Integratori
-      </button>
     </div>
   );
 }

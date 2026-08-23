@@ -80,6 +80,57 @@ export async function computeWeek(patientId: number, today: string): Promise<Wee
   return days;
 }
 
+export interface HabitWeekDay {
+  date: string;
+  dayLabel: string;
+  isToday: boolean;
+  dueCount: number;
+  doneCount: number;
+  duePct: number;
+}
+
+// Aderenza giornaliera alle abitudini negli ultimi 7 giorni: per ogni
+// giorno, quante abitudini erano dovute (in base ai giorni impostati OGGI —
+// non teniamo uno storico di come cambia la lista, semplificazione nota) e
+// quante sono state spuntate quel giorno.
+export async function computeHabitsWeek(patientId: number, today: string): Promise<HabitWeekDay[]> {
+  const { rows } = await db.execute({ sql: 'SELECT id, days FROM habits WHERE patient_id = ?', args: [patientId] });
+  const habits = (rows as any[]).map((r) => ({ id: r.id as number, days: String(r.days ?? '').split(',').filter(Boolean) }));
+
+  const dayLabels = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
+  const weekdayCodes = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const days: HabitWeekDay[] = [];
+  const cursor = new Date(`${today}T00:00:00Z`);
+  cursor.setUTCDate(cursor.getUTCDate() - 6);
+
+  for (let i = 0; i < 7; i++) {
+    const key = toDateKey(cursor);
+    const code = weekdayCodes[cursor.getUTCDay()];
+    const due = habits.filter((h) => h.days.length === 0 || h.days.includes(code));
+
+    let doneCount = 0;
+    if (due.length) {
+      const placeholders = due.map(() => '?').join(',');
+      const { rows: checkRows } = await db.execute({
+        sql: `SELECT COUNT(*) as c FROM habit_checks WHERE date = ? AND done = 1 AND habit_id IN (${placeholders})`,
+        args: [key, ...due.map((h) => h.id)],
+      });
+      doneCount = Number((checkRows[0] as any).c);
+    }
+
+    days.push({
+      date: key,
+      dayLabel: dayLabels[cursor.getUTCDay()],
+      isToday: key === today,
+      dueCount: due.length,
+      doneCount,
+      duePct: due.length ? Math.round((doneCount / due.length) * 100) : 0,
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
 export interface Badge {
   key: string;
   name: string;
