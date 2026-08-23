@@ -1,5 +1,5 @@
 import type {
-  AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember,
+  AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember, StudioDashboard,
   MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, Weekday,
 } from './types';
 
@@ -126,6 +126,7 @@ export const api = {
   setPatientOwner: (id: number, nutritionistId: number | null) =>
     nutriReq<{ ownerId: number | null; ownerName: string }>(`/nutritionist/patients/${id}/owner`, { method: 'PUT', body: JSON.stringify({ nutritionistId }) }),
   getNutritionistTeam: () => nutriReq<NutritionistTeamMember[]>('/nutritionist/team'),
+  getStudioDashboard: (from: string, to: string) => nutriReq<StudioDashboard>(`/nutritionist/dashboard?from=${from}&to=${to}`),
   resetNutritionistPassword: (id: number) => nutriReq<{ password: string }>(`/nutritionist/team/${id}/reset-password`, { method: 'POST' }),
 };
 

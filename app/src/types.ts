@@ -197,6 +197,22 @@ export interface NutritionistTeamMember {
   createdAt: string;
 }
 
+export interface StudioDashboardPatient {
+  id: number;
+  name: string;
+  ownerId: number | null;
+  ownerName: string;
+  adherencePct: number;
+  totalMeals: number;
+  messagesFromPatient: number;
+}
+
+export interface StudioDashboard {
+  from: string;
+  to: string;
+  patients: StudioDashboardPatient[];
+}
+
 export type MessageSender = 'paziente' | 'nutrizionista';
 
 export interface Message {

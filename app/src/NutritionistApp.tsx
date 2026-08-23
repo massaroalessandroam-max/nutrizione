@@ -3,13 +3,14 @@ import { useNutritionist } from './hooks/useNutritionist';
 import { PatientListView } from './components/nutritionist/PatientListView';
 import { PatientDetailView } from './components/nutritionist/PatientDetailView';
 import { TeamView } from './components/nutritionist/TeamView';
+import { DashboardView } from './components/nutritionist/DashboardView';
 import { authStorage } from './api';
 
 interface Props {
   onLogout: () => void;
 }
 
-type View = 'patients' | 'team';
+type View = 'patients' | 'team' | 'dashboard';
 
 // Su mobile lista e dettaglio si escludono a vicenda (una schermata alla
 // volta, come il resto dell'app): la classe is-detail-active decide quale
@@ -36,6 +37,21 @@ function NutritionistApp({ onLogout }: Props) {
     );
   }
 
+  if (view === 'dashboard') {
+    return (
+      <div className="nm-page">
+        <div className="nm-shell">
+          <div className="nm-patient-body">
+            <div className="nm-nutri-body">
+              <DashboardView team={n.team} onBack={() => setView('patients')} />
+            </div>
+            <button className="nm-modal-btn nm-modal-btn-secondary" style={{ margin: '0 20px' }} onClick={logout}>Esci</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="nm-page nm-nutri-page">
       <div className={`nm-nutri-shell ${n.activePatientId !== null ? 'is-detail-active' : ''}`}>
@@ -47,6 +63,7 @@ function NutritionistApp({ onLogout }: Props) {
               onSelect={n.selectPatient}
               onCreatePatient={n.createPatient}
               onOpenTeam={() => setView('team')}
+              onOpenDashboard={() => setView('dashboard')}
             />
           </div>
           <button className="nm-modal-btn nm-modal-btn-secondary nm-nutri-logout" onClick={logout}>Esci</button>

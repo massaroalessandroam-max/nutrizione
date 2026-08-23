@@ -197,3 +197,43 @@ nutritionistRouter.post('/team/:id/reset-password', async (req, res) => {
 
   res.json({ password });
 });
+
+// Aderenza di ogni paziente nel periodo, col relativo titolare — il client
+// aggrega/filtra per nutrizionista da qui, non serve un parametro dedicato:
+// stessa aderenza-nel-periodo già calcolata per il report del singolo
+// paziente (buildReport), solo estesa a tutto lo studio in un colpo solo.
+nutritionistRouter.get('/dashboard', async (req, res) => {
+  const from = String(req.query.from ?? '');
+  const to = String(req.query.to ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'intervallo non valido' });
+  }
+
+  const { rows } = await db.execute('SELECT id, name, owner_id FROM patients');
+  const patients = rows as unknown as Array<{ id: number; name: string; owner_id: number | null }>;
+  const owners = await ownerNames();
+
+  // Quanto scrive il paziente nel periodo — un indicatore di quanto sta
+  // seguendo/chiedendo supporto, utile accanto all'aderenza. date() legge
+  // anche gli ISO datetime salvati in created_at, non solo date pure.
+  const { rows: messageRows } = await db.execute({
+    sql: `SELECT patient_id, COUNT(*) as n FROM messages WHERE sender = 'paziente' AND date(created_at) >= ? AND date(created_at) <= ? GROUP BY patient_id`,
+    args: [from, to],
+  });
+  const messageCounts = new Map((messageRows as any[]).map((r) => [r.patient_id as number, r.n as number]));
+
+  const list = await Promise.all(patients.map(async (p) => {
+    const report = await buildReport(p.id, from, to);
+    return {
+      id: p.id,
+      name: p.name,
+      ownerId: p.owner_id,
+      ownerName: p.owner_id ? owners.get(p.owner_id) ?? '' : '',
+      adherencePct: report.adherencePct,
+      totalMeals: report.totalMeals,
+      messagesFromPatient: messageCounts.get(p.id) ?? 0,
+    };
+  }));
+
+  res.json({ from, to, patients: list });
+});
