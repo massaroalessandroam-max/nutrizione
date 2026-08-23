@@ -2,12 +2,20 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { Message } from '../../types';
 
-export function MessaggiView() {
+interface Props {
+  // Aprire il thread segna i messaggi del nutrizionista come letti sul
+  // server: questa callback rinfresca lo stato del Diario, altrimenti il
+  // pallino sulla tab resterebbe acceso finché non scatta un altro refresh.
+  onMessagesOpened: () => void;
+}
+
+export function MessaggiView({ onMessagesOpened }: Props) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [text, setText] = useState('');
 
   useEffect(() => {
-    api.getMessages().then(setMessages).catch(() => setMessages([]));
+    api.getMessages().then(setMessages).catch(() => setMessages([])).finally(onMessagesOpened);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const send = async () => {

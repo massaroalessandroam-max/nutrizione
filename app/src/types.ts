@@ -70,6 +70,8 @@ export interface AppState {
   // Prossima visita impostata dal nutrizionista, facoltativa — stringa vuota se non impostata.
   nextVisitAt: string;
   nextVisitNote: string;
+  // C'è almeno un messaggio del nutrizionista non ancora aperto dal paziente.
+  unreadMessages: boolean;
   points: number;
   streak: number;
   freq: 'meal' | 'multi' | 'day' | 'manual';
@@ -186,4 +188,5 @@ export interface Message {
   sender: MessageSender;
   text: string;
   createdAt: string;
+  read: boolean;
 }

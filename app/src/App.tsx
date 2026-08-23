@@ -49,10 +49,10 @@ function App() {
               {d.tab === 'premi' && <PremiView state={d.appState} onDayClick={d.openBackfill} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
               {d.tab === 'report' && <ReportView state={d.appState} onSetFreq={d.setFreq} />}
-              {d.tab === 'messaggi' && <MessaggiView />}
+              {d.tab === 'messaggi' && <MessaggiView onMessagesOpened={d.refreshState} />}
             </>
           )}
-          {d.appState?.onboarded && <BottomNav tab={d.tab} onChange={d.setTab} />}
+          {d.appState?.onboarded && <BottomNav tab={d.tab} onChange={d.setTab} unreadMessages={d.appState.unreadMessages} />}
         </div>
 
         {mealsSource && (

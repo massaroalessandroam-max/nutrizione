@@ -26,6 +26,10 @@
     overflow: hidden;
     min-height: 900px;
   }
+  /* La shell qui è una card bordata, non il viewport reale: la barra deve
+     restare dentro i suoi bordi (absolute, come prima), non attaccata al
+     fondo dello schermo del browser. */
+  .nm-bottom-nav { position: absolute; left: 0; right: 0; transform: none; max-width: none; }
 }
 
 .nm-patient-body { padding-bottom: 88px; }
@@ -358,9 +362,17 @@
   background: var(--card); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none;
 }
 
-/* ===== Bottom nav ===== */
+/* ===== Bottom nav =====
+   Da vero mobile (sotto i 560px, vedi override più sotto) resta fissa in
+   fondo allo schermo mentre il contenuto sopra scorre — per questo di base
+   è `position: fixed` (rispetto al viewport, non alla shell) e centrata
+   sulla stessa larghezza massima della shell. Da tablet in su la shell
+   diventa una "card" telefono bordata: lì la barra deve restare dentro la
+   card (position: absolute rispetto alla shell), non attaccata al bordo
+   reale del browser — vedi la media query in cima al file. */
 .nm-bottom-nav {
-  position: absolute; bottom: 0; left: 0; right: 0;
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 452px;
   background: rgba(242, 249, 250, .94); backdrop-filter: blur(10px);
   border-top: 1px solid var(--line-medium);
   display: flex; padding: 10px 8px 14px;
@@ -370,6 +382,11 @@
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
 .nm-nav-btn span:last-child { font-size: 10.5px; }
+.nm-nav-icon-wrap { position: relative; display: flex; }
+.nm-nav-badge {
+  position: absolute; top: -2px; right: -3px; width: 9px; height: 9px;
+  border-radius: 999px; background: var(--bad-fg-strong); border: 1.5px solid var(--app-surface);
+}
 
 /* ===== Sheet ===== */
 .nm-sheet-overlay { position: absolute; inset: 0; z-index: 40; }

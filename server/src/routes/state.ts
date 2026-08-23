@@ -5,6 +5,7 @@ import { score, verdict, verdictOf, pointsForFoods, foodMatches, type MatchConte
 import { computeStreak, computeWeek, computeBadges } from '../stats.js';
 import { romeParts, todayStr } from '../time.js';
 import { requirePatient } from '../auth.js';
+import { hasUnreadMessages } from './messages.js';
 
 export const stateRouter = Router();
 stateRouter.use(requirePatient);
@@ -161,9 +162,11 @@ export async function buildState(patientId: number) {
   const streak = await computeStreak(patientId, date);
   const { rows: patientRows } = await db.execute({ sql: 'SELECT next_visit_at, next_visit_note FROM patients WHERE id = ?', args: [patientId] });
   const patientRow = patientRows[0] as any;
+  const unreadMessages = await hasUnreadMessages(patientId, 'paziente');
 
   return {
     date,
+    unreadMessages,
     nextVisitAt: patientRow?.next_visit_at ?? '',
     nextVisitNote: patientRow?.next_visit_note ?? '',
     points: appState.points as number,

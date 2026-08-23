@@ -129,6 +129,13 @@ export async function initDb(): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+  // Letto/non letto — solo per il pallino di notifica sulla tab Messaggi.
+  // Stesso pattern ALTER-in-try/catch delle altre colonne aggiunte dopo.
+  try {
+    await db.execute('ALTER TABLE messages ADD COLUMN read INTEGER NOT NULL DEFAULT 0');
+  } catch {
+    // colonna già presente
+  }
 
   // ===== Dati del paziente: da singleton a una riga/gruppo per patient_id =====
 

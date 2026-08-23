@@ -10,7 +10,13 @@ const NAV_ITEMS: Array<{ key: Tab; label: string }> = [
   { key: 'messaggi', label: 'Messaggi' },
 ];
 
-export function BottomNav({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+interface Props {
+  tab: Tab;
+  onChange: (t: Tab) => void;
+  unreadMessages: boolean;
+}
+
+export function BottomNav({ tab, onChange, unreadMessages }: Props) {
   return (
     <div className="nm-bottom-nav">
       {NAV_ITEMS.map((n) => {
@@ -18,7 +24,10 @@ export function BottomNav({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => v
         const color = on ? 'var(--teal-700)' : 'var(--ink-faint)';
         return (
           <button key={n.key} className="nm-nav-btn" style={{ color }} onClick={() => onChange(n.key)}>
-            <NavIcon name={n.key} color={color} />
+            <span className="nm-nav-icon-wrap">
+              <NavIcon name={n.key} color={color} />
+              {n.key === 'messaggi' && unreadMessages && <span className="nm-nav-badge" />}
+            </span>
             <span style={{ fontWeight: on ? 700 : 500 }}>{n.label}</span>
           </button>
         );

@@ -5,7 +5,7 @@ import { buildState } from './state.js';
 import { buildReport, buildMacros } from './report.js';
 import { loadHabits } from './habits.js';
 import { loadPlanItems, loadPlanNotes } from './plan.js';
-import { loadMessages, addMessage } from './messages.js';
+import { loadMessages, addMessage, markMessagesRead } from './messages.js';
 
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
@@ -127,7 +127,10 @@ nutritionistRouter.get('/patients/:id/report/macros', async (req, res) => {
 });
 
 nutritionistRouter.get('/patients/:id/messages', async (req, res) => {
-  res.json(await loadMessages(Number(req.params.id)));
+  const patientId = Number(req.params.id);
+  const list = await loadMessages(patientId);
+  await markMessagesRead(patientId, 'nutrizionista');
+  res.json(list);
 });
 
 nutritionistRouter.post('/patients/:id/messages', async (req, res) => {
