@@ -123,6 +123,8 @@ export const api = {
   getPatientMessages: (id: number) => nutriReq<Message[]>(`/nutritionist/patients/${id}/messages`),
   sendPatientMessage: (id: number, text: string) => nutriReq<Message[]>(`/nutritionist/patients/${id}/messages`, { method: 'POST', body: JSON.stringify({ text }) }),
   regeneratePatientCode: (id: number) => nutriReq<{ accessCode: string }>(`/nutritionist/patients/${id}/regenerate-code`, { method: 'POST' }),
+  setPatientOwner: (id: number, nutritionistId: number | null) =>
+    nutriReq<{ ownerId: number | null; ownerName: string }>(`/nutritionist/patients/${id}/owner`, { method: 'PUT', body: JSON.stringify({ nutritionistId }) }),
   getNutritionistTeam: () => nutriReq<NutritionistTeamMember[]>('/nutritionist/team'),
   resetNutritionistPassword: (id: number) => nutriReq<{ password: string }>(`/nutritionist/team/${id}/reset-password`, { method: 'POST' }),
 };

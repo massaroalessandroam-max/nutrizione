@@ -157,6 +157,10 @@ export interface NutritionistPatientListItem {
   // C'è almeno un messaggio nel thread — usato solo per l'ordine di
   // default della lista (chi ha uno scambio aperto viene prima).
   hasMessages: boolean;
+  // Titolare del rapporto — etichetta, non limita chi vede/risponde: il
+  // pool resta condiviso a tutto lo studio.
+  ownerId: number | null;
+  ownerName: string;
 }
 
 export interface NutritionistPatientDetail {
@@ -164,6 +168,8 @@ export interface NutritionistPatientDetail {
   name: string;
   nextVisitAt: string;
   nextVisitNote: string;
+  ownerId: number | null;
+  ownerName: string;
   state: AppState;
   habits: Habit[];
   plan: { items: PlanItemLite[]; notes: PlanNotesLite };

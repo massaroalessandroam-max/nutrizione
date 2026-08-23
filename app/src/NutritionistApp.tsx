@@ -58,9 +58,11 @@ function NutritionistApp({ onLogout }: Props) {
               <PatientDetailView
                 patient={n.activePatient}
                 messages={n.messages}
+                team={n.team}
                 onBack={n.backToList}
                 onSetNextVisit={n.setNextVisit}
                 onSendMessage={n.sendMessage}
+                onSetOwner={n.setOwner}
               />
             ) : (
               <div className="nm-empty-state">Seleziona un paziente dalla lista.</div>

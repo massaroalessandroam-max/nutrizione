@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import type { NutritionistPatientListItem, NutritionistPatientDetail, Message } from '../types';
+import type { NutritionistPatientListItem, NutritionistPatientDetail, NutritionistTeamMember, Message } from '../types';
 
 export function useNutritionist() {
   const [patients, setPatients] = useState<NutritionistPatientListItem[] | null>(null);
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
   const [activePatient, setActivePatient] = useState<NutritionistPatientDetail | null>(null);
   const [messages, setMessages] = useState<Message[] | null>(null);
+  // Per il selettore "titolare" nel dettaglio paziente — caricato una volta,
+  // non cambia spesso quanto la lista pazienti.
+  const [team, setTeam] = useState<NutritionistTeamMember[] | null>(null);
 
   const refreshPatients = useCallback(async () => {
     setPatients(await api.getNutritionistPatients());
@@ -14,6 +17,7 @@ export function useNutritionist() {
 
   useEffect(() => {
     refreshPatients();
+    api.getNutritionistTeam().then(setTeam).catch(() => setTeam([]));
   }, [refreshPatients]);
 
   const refreshActivePatient = useCallback(async (id: number) => {
@@ -58,9 +62,15 @@ export function useNutritionist() {
     return inviteToken;
   }, []);
 
+  const setOwner = useCallback(async (nutritionistId: number | null) => {
+    if (!activePatientId) return;
+    await api.setPatientOwner(activePatientId, nutritionistId);
+    await refreshActivePatient(activePatientId);
+  }, [activePatientId, refreshActivePatient]);
+
   return {
-    patients, activePatientId, activePatient, messages,
-    selectPatient, backToList, createPatient, setNextVisit, sendMessage, generateInvite,
+    patients, activePatientId, activePatient, messages, team,
+    selectPatient, backToList, createPatient, setNextVisit, sendMessage, generateInvite, setOwner,
   };
 }
 

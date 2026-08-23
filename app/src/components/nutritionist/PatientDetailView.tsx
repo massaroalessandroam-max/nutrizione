@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { NutritionistPatientDetail, Message } from '../../types';
+import type { NutritionistPatientDetail, NutritionistTeamMember, Message } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { badgeClass } from '../../lib/tone';
 import { MEAL_LABEL, MOOD_EMOJI, formatDateLabel } from '../../lib/mealMeta';
@@ -22,16 +22,18 @@ const TABS: Array<{ key: Tab; label: string }> = [
 interface Props {
   patient: NutritionistPatientDetail | null;
   messages: Message[] | null;
+  team: NutritionistTeamMember[] | null;
   onBack: () => void;
   onSetNextVisit: (at: string, note: string) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
+  onSetOwner: (nutritionistId: number | null) => Promise<void>;
 }
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function PatientDetailView({ patient, messages, onBack, onSetNextVisit, onSendMessage }: Props) {
+export function PatientDetailView({ patient, messages, team, onBack, onSetNextVisit, onSendMessage, onSetOwner }: Props) {
   const [tab, setTab] = useState<Tab>('diario');
   const [visitAt, setVisitAt] = useState('');
   const [visitNote, setVisitNote] = useState('');
@@ -94,6 +96,19 @@ export function PatientDetailView({ patient, messages, onBack, onSetNextVisit, o
         <button className="nm-modal-btn nm-modal-btn-secondary" style={{ flex: 'none' }} onClick={regenerateCode}>
           Rigenera codice
         </button>
+      </div>
+
+      <div className="nm-owner-row">
+        <span className="nm-owner-label">Titolare</span>
+        <select
+          className="nm-owner-select"
+          value={patient.ownerId ?? ''}
+          onChange={(e) => onSetOwner(e.target.value ? Number(e.target.value) : null)}
+        >
+          <option value="">Non assegnato</option>
+          {team?.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <span className="nm-page-sub" style={{ margin: 0 }}>Visibile a tutto il team in ogni caso.</span>
       </div>
 
       {newCode && (

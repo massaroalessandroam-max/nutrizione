@@ -772,6 +772,12 @@
 .nm-patient-header { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
 .nm-patient-header-name { font-size: 19px; font-weight: 700; }
 .nm-patient-header-plan { font-size: 12.5px; color: var(--ink-soft); }
+.nm-owner-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -6px 0 16px; }
+.nm-owner-label { font-size: 11.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .3px; }
+.nm-owner-select {
+  border: 1.5px solid var(--line-medium); background: var(--card); color: var(--ink);
+  border-radius: 999px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
 .nm-patient-stats { display: flex; gap: 9px; margin-bottom: 16px; }
 .nm-patient-stat {
   flex: 1; background: var(--card); border: 1px solid var(--line-soft); border-radius: 14px;

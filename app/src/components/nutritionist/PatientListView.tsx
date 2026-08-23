@@ -110,6 +110,7 @@ export function PatientListView({ patients, activePatientId, onSelect, onCreateP
             </div>
             <div className="nm-patient-row-meta">
               <span className="nm-badge nm-badge-ok">{p.adherencePct}%</span>
+              <div className="nm-patient-row-time">{p.ownerName || 'Non assegnato'}</div>
               {p.nextVisitAt && <div className="nm-patient-row-time">Visita {p.nextVisitAt}</div>}
             </div>
           </button>

@@ -80,6 +80,15 @@ export async function initDb(): Promise<void> {
   // Vecchia tabella demo, sostituita dal vero "meals" scoperto per paziente.
   await db.execute('DROP TABLE IF EXISTS patient_meals');
 
+  // Titolare del rapporto col paziente — NULL = non assegnato. Il pool resta
+  // condiviso (chiunque dello studio vede e può rispondere a tutti), questo
+  // serve solo a sapere di chi è il paziente, non a limitare l'accesso.
+  try {
+    await db.execute('ALTER TABLE patients ADD COLUMN owner_id INTEGER');
+  } catch {
+    // colonna già presente
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS patient_sessions (
       token_hash TEXT PRIMARY KEY,

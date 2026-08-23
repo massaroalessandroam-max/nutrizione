@@ -10,22 +10,31 @@ import { loadMessages, addMessage, markMessagesRead } from './messages.js';
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
 
-interface PatientRow { id: number; name: string; created_at: string; next_visit_at: string; next_visit_note: string }
+interface PatientRow { id: number; name: string; created_at: string; next_visit_at: string; next_visit_note: string; owner_id: number | null }
 
 async function getPatientRow(id: number): Promise<PatientRow | undefined> {
-  const { rows } = await db.execute({ sql: 'SELECT id, name, created_at, next_visit_at, next_visit_note FROM patients WHERE id = ?', args: [id] });
+  const { rows } = await db.execute({ sql: 'SELECT id, name, created_at, next_visit_at, next_visit_note, owner_id FROM patients WHERE id = ?', args: [id] });
   return rows[0] as unknown as PatientRow | undefined;
 }
 
+async function ownerNames(): Promise<Map<number, string>> {
+  const { rows } = await db.execute('SELECT id, name FROM nutritionists');
+  return new Map((rows as any[]).map((r) => [r.id as number, r.name as string]));
+}
+
 // Pool condiviso: qualunque nutrizionista dello studio vede tutti i
-// pazienti, non solo quelli che ha creato lui. Ordine di default pensato
-// per il triage: prima chi ha uno scambio di messaggi aperto (c'è
-// probabilmente qualcosa da seguire), poi per aderenza crescente — così chi
-// segue meno il piano si vede subito, senza dover ordinare a mano.
+// pazienti, non solo quelli che ha creato lui — l'owner_id (titolare del
+// rapporto) è solo un'etichetta per sapere di chi è, non limita l'accesso:
+// se il titolare è assente, chiunque in team vede comunque i messaggi e può
+// rispondere. Ordine di default pensato per il triage: prima chi ha uno
+// scambio di messaggi aperto (c'è probabilmente qualcosa da seguire), poi
+// per aderenza crescente — così chi segue meno il piano si vede subito,
+// senza dover ordinare a mano.
 nutritionistRouter.get('/patients', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, name, next_visit_at, next_visit_note FROM patients');
+  const { rows } = await db.execute('SELECT id, name, next_visit_at, next_visit_note, owner_id FROM patients');
   const { rows: messageCounts } = await db.execute('SELECT patient_id, COUNT(*) as n FROM messages GROUP BY patient_id');
   const patientsWithMessages = new Set((messageCounts as any[]).map((r) => r.patient_id as number));
+  const owners = await ownerNames();
 
   const list = await Promise.all((rows as unknown as PatientRow[]).map(async (p) => {
     const state = await buildState(p.id);
@@ -39,6 +48,8 @@ nutritionistRouter.get('/patients', async (_req, res) => {
       nextVisitAt: p.next_visit_at,
       nextVisitNote: p.next_visit_note,
       hasMessages: patientsWithMessages.has(p.id),
+      ownerId: p.owner_id,
+      ownerName: p.owner_id ? owners.get(p.owner_id) ?? '' : '',
     };
   }));
 
@@ -51,9 +62,11 @@ nutritionistRouter.post('/patients', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'nome obbligatorio' });
 
   const code = newAccessCode();
+  // Chi crea il paziente ne diventa titolare di default — riassegnabile
+  // dopo dal dettaglio paziente.
   const result = await db.execute({
-    sql: 'INSERT INTO patients (name, access_code_hash, created_at) VALUES (?, ?, ?)',
-    args: [name, hashAccessCode(code), new Date().toISOString()],
+    sql: 'INSERT INTO patients (name, access_code_hash, created_at, owner_id) VALUES (?, ?, ?, ?)',
+    args: [name, hashAccessCode(code), new Date().toISOString(), req.nutritionistId!],
   });
   const patientId = Number(result.lastInsertRowid);
   await ensurePatientAppState(patientId);
@@ -67,11 +80,12 @@ nutritionistRouter.get('/patients/:id', async (req, res) => {
   const patient = await getPatientRow(patientId);
   if (!patient) return res.status(404).json({ error: 'paziente non trovato' });
 
-  const [state, habits, planItems, planNotes] = await Promise.all([
+  const [state, habits, planItems, planNotes, owners] = await Promise.all([
     buildState(patientId),
     loadHabits(patientId),
     loadPlanItems(patientId),
     loadPlanNotes(patientId),
+    ownerNames(),
   ]);
 
   res.json({
@@ -79,10 +93,33 @@ nutritionistRouter.get('/patients/:id', async (req, res) => {
     name: patient.name,
     nextVisitAt: patient.next_visit_at,
     nextVisitNote: patient.next_visit_note,
+    ownerId: patient.owner_id,
+    ownerName: patient.owner_id ? owners.get(patient.owner_id) ?? '' : '',
     state,
     habits,
     plan: { items: planItems, notes: planNotes },
   });
+});
+
+// Riassegna il titolare del rapporto (o lo rimuove con nutritionistId null)
+// — sola etichetta, non tocca la visibilità: il pool resta condiviso.
+nutritionistRouter.put('/patients/:id/owner', async (req, res) => {
+  const patientId = Number(req.params.id);
+  const patient = await getPatientRow(patientId);
+  if (!patient) return res.status(404).json({ error: 'paziente non trovato' });
+
+  const nutritionistId = req.body?.nutritionistId;
+  let ownerId: number | null = null;
+  if (nutritionistId !== null && nutritionistId !== undefined) {
+    const id = Number(nutritionistId);
+    const { rows } = await db.execute({ sql: 'SELECT id FROM nutritionists WHERE id = ?', args: [id] });
+    if (!rows[0]) return res.status(400).json({ error: 'nutrizionista non trovato' });
+    ownerId = id;
+  }
+
+  await db.execute({ sql: 'UPDATE patients SET owner_id = ? WHERE id = ?', args: [ownerId, patientId] });
+  const owners = await ownerNames();
+  res.json({ ownerId, ownerName: ownerId ? owners.get(ownerId) ?? '' : '' });
 });
 
 nutritionistRouter.put('/patients/:id/next-visit', async (req, res) => {
