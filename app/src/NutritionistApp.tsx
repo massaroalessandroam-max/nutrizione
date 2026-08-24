@@ -24,14 +24,12 @@ function NutritionistApp({ onLogout }: Props) {
 
   if (view === 'team') {
     return (
-      <div className="nm-page">
-        <div className="nm-shell">
-          <div className="nm-patient-body">
-            <div className="nm-nutri-body">
-              <TeamView onBack={() => setView('patients')} onGenerateInvite={n.generateInvite} />
-            </div>
-            <button className="nm-modal-btn nm-modal-btn-secondary" style={{ margin: '0 20px' }} onClick={logout}>Esci</button>
+      <div className="nm-page nm-nutri-page">
+        <div className="nm-nutri-solo-shell">
+          <div className="nm-nutri-body">
+            <TeamView onBack={() => setView('patients')} onGenerateInvite={n.generateInvite} />
           </div>
+          <button className="nm-modal-btn nm-modal-btn-secondary nm-nutri-logout" onClick={logout}>Esci</button>
         </div>
       </div>
     );
@@ -39,14 +37,12 @@ function NutritionistApp({ onLogout }: Props) {
 
   if (view === 'dashboard') {
     return (
-      <div className="nm-page">
-        <div className="nm-shell">
-          <div className="nm-patient-body">
-            <div className="nm-nutri-body">
-              <DashboardView team={n.team} onBack={() => setView('patients')} />
-            </div>
-            <button className="nm-modal-btn nm-modal-btn-secondary" style={{ margin: '0 20px' }} onClick={logout}>Esci</button>
+      <div className="nm-page nm-nutri-page">
+        <div className="nm-nutri-solo-shell">
+          <div className="nm-nutri-body">
+            <DashboardView team={n.team} onBack={() => setView('patients')} />
           </div>
+          <button className="nm-modal-btn nm-modal-btn-secondary nm-nutri-logout" onClick={logout}>Esci</button>
         </div>
       </div>
     );
@@ -77,7 +73,11 @@ function NutritionistApp({ onLogout }: Props) {
                 messages={n.messages}
                 team={n.team}
                 onBack={n.backToList}
-                onSetNextVisit={n.setNextVisit}
+                onAddAppointment={n.addAppointment}
+                onDeleteAppointment={n.deleteAppointment}
+                onAddGoal={n.addGoal}
+                onDeleteGoal={n.deleteGoal}
+                onSavePlan={n.savePlan}
                 onSendMessage={n.sendMessage}
                 onSetOwner={n.setOwner}
               />

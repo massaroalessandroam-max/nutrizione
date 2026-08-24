@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
-  api, PLAN_CATEGORIES, MAX_PER_WEEK_OPTIONS, planUploadDownloadUrl,
+  api, PLAN_CATEGORIES, planUploadDownloadUrl,
   type PlanItem, type PlanNotes, type PlanUpload, type ChefCombo,
 } from '../../api';
 import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
 import { fileToBase64 } from '../../lib/file';
 import { MEAL_LABEL } from '../../lib/mealMeta';
+import { MAX_PER_WEEK_LABEL, MAX_PER_WEEK_SELECT_OPTIONS } from '../../lib/planMeta';
 import { MEAL_ORDER, type MealKey } from '../../types';
 
-const MAX_PER_WEEK_LABEL: Record<string, string> = {
-  '': '-', '1': '1 volta/sett.', '2': '2 volte/sett.', '3': '3 volte/sett.', sempre: 'Sempre', opzionale: 'Opzionale',
-};
-const MAX_PER_WEEK_SELECT_OPTIONS = ['', ...MAX_PER_WEEK_OPTIONS];
 const OTHER_CATEGORY = 'Altro';
 const GROUPS = [...PLAN_CATEGORIES, OTHER_CATEGORY];
 

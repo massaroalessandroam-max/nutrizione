@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../api';
-import type { NutritionistPatientListItem, NutritionistPatientDetail, NutritionistTeamMember, Message } from '../types';
+import { api, type PlanItem } from '../api';
+import type { NutritionistPatientListItem, NutritionistPatientDetail, NutritionistTeamMember, Message, GoalLevel } from '../types';
 
 export function useNutritionist() {
   const [patients, setPatients] = useState<NutritionistPatientListItem[] | null>(null);
@@ -46,9 +46,33 @@ export function useNutritionist() {
     return created;
   }, [refreshPatients]);
 
-  const setNextVisit = useCallback(async (nextVisitAt: string, nextVisitNote: string) => {
+  const addAppointment = useCallback(async (at: string, note: string) => {
     if (!activePatientId) return;
-    await api.setPatientNextVisit(activePatientId, nextVisitAt, nextVisitNote);
+    await api.addPatientAppointment(activePatientId, at, note);
+    await refreshActivePatient(activePatientId);
+  }, [activePatientId, refreshActivePatient]);
+
+  const deleteAppointment = useCallback(async (appointmentId: number) => {
+    if (!activePatientId) return;
+    await api.deletePatientAppointment(activePatientId, appointmentId);
+    await refreshActivePatient(activePatientId);
+  }, [activePatientId, refreshActivePatient]);
+
+  const addGoal = useCallback(async (level: GoalLevel, text: string, targetDate: string) => {
+    if (!activePatientId) return;
+    await api.addPatientGoal(activePatientId, level, text, targetDate);
+    await refreshActivePatient(activePatientId);
+  }, [activePatientId, refreshActivePatient]);
+
+  const deleteGoal = useCallback(async (goalId: number) => {
+    if (!activePatientId) return;
+    await api.deletePatientGoal(activePatientId, goalId);
+    await refreshActivePatient(activePatientId);
+  }, [activePatientId, refreshActivePatient]);
+
+  const savePlan = useCallback(async (items: PlanItem[]) => {
+    if (!activePatientId) return;
+    await api.setPatientPlan(activePatientId, items);
     await refreshActivePatient(activePatientId);
   }, [activePatientId, refreshActivePatient]);
 
@@ -70,7 +94,8 @@ export function useNutritionist() {
 
   return {
     patients, activePatientId, activePatient, messages, team,
-    selectPatient, backToList, createPatient, setNextVisit, sendMessage, generateInvite, setOwner,
+    selectPatient, backToList, createPatient, sendMessage, generateInvite, setOwner,
+    addAppointment, deleteAppointment, addGoal, deleteGoal, savePlan,
   };
 }
 

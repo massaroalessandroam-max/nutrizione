@@ -4,16 +4,18 @@ import { newAccessCode, hashAccessCode, newTempPassword, hashPassword, requireNu
 import { buildState } from './state.js';
 import { buildReport, buildMacros } from './report.js';
 import { loadHabits } from './habits.js';
-import { loadPlanItems, loadPlanNotes } from './plan.js';
+import { loadPlanItems, loadPlanNotes, savePlanItems } from './plan.js';
 import { loadMessages, addMessage, markMessagesRead } from './messages.js';
+import { addAppointment, deleteAppointment } from './appointments.js';
+import { GOAL_LEVELS, addGoal, deleteGoal, type GoalLevel } from './goals.js';
 
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
 
-interface PatientRow { id: number; name: string; created_at: string; next_visit_at: string; next_visit_note: string; owner_id: number | null }
+interface PatientRow { id: number; name: string; created_at: string; owner_id: number | null }
 
 async function getPatientRow(id: number): Promise<PatientRow | undefined> {
-  const { rows } = await db.execute({ sql: 'SELECT id, name, created_at, next_visit_at, next_visit_note, owner_id FROM patients WHERE id = ?', args: [id] });
+  const { rows } = await db.execute({ sql: 'SELECT id, name, created_at, owner_id FROM patients WHERE id = ?', args: [id] });
   return rows[0] as unknown as PatientRow | undefined;
 }
 
@@ -31,13 +33,17 @@ async function ownerNames(): Promise<Map<number, string>> {
 // per aderenza crescente — così chi segue meno il piano si vede subito,
 // senza dover ordinare a mano.
 nutritionistRouter.get('/patients', async (_req, res) => {
-  const { rows } = await db.execute('SELECT id, name, next_visit_at, next_visit_note, owner_id FROM patients');
+  const { rows } = await db.execute('SELECT id, name, owner_id FROM patients');
   const { rows: messageCounts } = await db.execute('SELECT patient_id, COUNT(*) as n FROM messages GROUP BY patient_id');
   const patientsWithMessages = new Set((messageCounts as any[]).map((r) => r.patient_id as number));
   const owners = await ownerNames();
+  const today = new Date().toISOString().slice(0, 10);
 
   const list = await Promise.all((rows as unknown as PatientRow[]).map(async (p) => {
     const state = await buildState(p.id);
+    // Solo il prossimo, per la riga compatta della lista — lo storico
+    // completo si vede aprendo il dettaglio.
+    const nextAppointment = state.appointments.find((a) => a.at >= today);
     return {
       id: p.id,
       name: p.name,
@@ -45,8 +51,8 @@ nutritionistRouter.get('/patients', async (_req, res) => {
       adherencePct: state.adherencePct,
       streak: state.streak,
       points: state.points,
-      nextVisitAt: p.next_visit_at,
-      nextVisitNote: p.next_visit_note,
+      nextVisitAt: nextAppointment?.at ?? '',
+      nextVisitNote: nextAppointment?.note ?? '',
       hasMessages: patientsWithMessages.has(p.id),
       ownerId: p.owner_id,
       ownerName: p.owner_id ? owners.get(p.owner_id) ?? '' : '',
@@ -91,8 +97,6 @@ nutritionistRouter.get('/patients/:id', async (req, res) => {
   res.json({
     id: patient.id,
     name: patient.name,
-    nextVisitAt: patient.next_visit_at,
-    nextVisitNote: patient.next_visit_note,
     ownerId: patient.owner_id,
     ownerName: patient.owner_id ? owners.get(patient.owner_id) ?? '' : '',
     state,
@@ -122,13 +126,48 @@ nutritionistRouter.put('/patients/:id/owner', async (req, res) => {
   res.json({ ownerId, ownerName: ownerId ? owners.get(ownerId) ?? '' : '' });
 });
 
-nutritionistRouter.put('/patients/:id/next-visit', async (req, res) => {
+// Storico appuntamenti (passati e futuri) — non un singolo campo
+// sovrascrivibile: il nutrizionista può accumularne più di uno nel tempo.
+nutritionistRouter.post('/patients/:id/appointments', async (req, res) => {
   const patientId = Number(req.params.id);
-  const nextVisitAt = typeof req.body?.nextVisitAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.nextVisitAt) ? req.body.nextVisitAt : '';
-  const nextVisitNote = typeof req.body?.nextVisitNote === 'string' ? req.body.nextVisitNote.trim() : '';
+  const at = String(req.body?.at ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(at)) return res.status(400).json({ error: 'data non valida' });
+  const note = String(req.body?.note ?? '').trim();
+  res.json(await addAppointment(patientId, at, note));
+});
 
-  await db.execute({ sql: 'UPDATE patients SET next_visit_at = ?, next_visit_note = ? WHERE id = ?', args: [nextVisitAt, nextVisitNote, patientId] });
-  res.json({ nextVisitAt, nextVisitNote });
+nutritionistRouter.delete('/patients/:id/appointments/:appointmentId', async (req, res) => {
+  const patientId = Number(req.params.id);
+  const appointmentId = Number(req.params.appointmentId);
+  res.json(await deleteAppointment(patientId, appointmentId));
+});
+
+// Obiettivi macro (lungo termine) e micro (breve termine) — testo libero
+// scelto dal nutrizionista ("perdere 30kg in un anno", "correre una
+// maratona in 4 ore"...) con una scadenza, non un valore numerico da
+// tracciare.
+nutritionistRouter.post('/patients/:id/goals', async (req, res) => {
+  const patientId = Number(req.params.id);
+  const level = String(req.body?.level ?? '') as GoalLevel;
+  if (!(GOAL_LEVELS as readonly string[]).includes(level)) return res.status(400).json({ error: 'livello non valido' });
+  const text = String(req.body?.text ?? '').trim();
+  if (!text) return res.status(400).json({ error: 'testo obbligatorio' });
+  const targetDate = String(req.body?.targetDate ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) return res.status(400).json({ error: 'scadenza non valida' });
+  res.json(await addGoal(patientId, level, text, targetDate));
+});
+
+nutritionistRouter.delete('/patients/:id/goals/:goalId', async (req, res) => {
+  const patientId = Number(req.params.id);
+  const goalId = Number(req.params.goalId);
+  res.json(await deleteGoal(patientId, goalId));
+});
+
+// Stesso piano del paziente (nutrition_plan_items): entrambi possono
+// aggiungere/modificare/cancellare voci, non è una copia separata.
+nutritionistRouter.put('/patients/:id/plan', async (req, res) => {
+  const patientId = Number(req.params.id);
+  res.json(await savePlanItems(patientId, req.body?.items));
 });
 
 // Il paziente perde il codice (o va dato a un nuovo telefono): ne genera

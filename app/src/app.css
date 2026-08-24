@@ -739,6 +739,22 @@
   .nm-nutri-main .nm-nutri-body { max-width: 720px; margin: 0 auto; width: 100%; }
   .nm-nutri-main .nm-back-btn { display: none; }
 }
+
+/* Schermate a colonna singola (Dashboard, Team) aperte da fuori la lista
+   pazienti: stesso trattamento desktop di nm-nutri-shell (largo, centrato),
+   ma senza la colonna sidebar — qui c'è un solo pannello di contenuto. */
+.nm-nutri-solo-shell {
+  width: 100%; min-height: 100vh; display: flex; flex-direction: column; background: var(--app-surface);
+}
+.nm-nutri-solo-shell .nm-nutri-body { flex: 1; }
+@media (min-width: 900px) {
+  .nm-nutri-solo-shell {
+    max-width: 1180px; min-height: 760px;
+    border-radius: 24px; box-shadow: var(--shadow-shell); overflow: hidden;
+    max-height: 100vh; overflow-y: auto;
+  }
+  .nm-nutri-solo-shell .nm-nutri-body { max-width: 720px; margin: 0 auto; width: 100%; }
+}
 .nm-nutri-stats { display: flex; gap: 9px; margin-bottom: 16px; }
 .nm-nutri-stat {
   flex: 1; border-radius: 16px; padding: 14px;

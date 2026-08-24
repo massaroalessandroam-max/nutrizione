@@ -102,9 +102,11 @@ planRouter.get('/plan', async (req, res) => {
   res.json(await loadPlanItems(req.patientId!));
 });
 
-planRouter.post('/plan', async (req, res) => {
-  const patientId = req.patientId!;
-  const items = cleanItems(req.body?.items);
+// Estratta come funzione esportata — usata sia dalla route paziente (patientId
+// dal token) sia da quella nutrizionista (patientId dall'URL): stesso piano
+// condiviso, entrambi possono aggiungere/modificare/cancellare voci.
+export async function savePlanItems(patientId: number, itemsInput: unknown): Promise<PlanItem[]> {
+  const items = cleanItems(itemsInput);
 
   await db.execute({ sql: 'DELETE FROM nutrition_plan_items WHERE patient_id = ?', args: [patientId] });
   for (const [idx, it] of items.entries()) {
@@ -114,7 +116,11 @@ planRouter.post('/plan', async (req, res) => {
     });
   }
 
-  res.json(items);
+  return items;
+}
+
+planRouter.post('/plan', async (req, res) => {
+  res.json(await savePlanItems(req.patientId!, req.body?.items));
 });
 
 // Estrazione alimenti+grammature da una foto o un PDF del piano, via Claude

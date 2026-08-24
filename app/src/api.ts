@@ -1,6 +1,6 @@
 import type {
   AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember, StudioDashboard,
-  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, Weekday,
+  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, Weekday, Appointment, Goal, GoalLevel,
 } from './types';
 
 const PATIENT_TOKEN_KEY = 'nm_patient_token';
@@ -116,8 +116,16 @@ export const api = {
   getNutritionistPatients: () => nutriReq<NutritionistPatientListItem[]>('/nutritionist/patients'),
   createPatient: (name: string) => nutriReq<{ id: number; name: string; accessCode: string }>('/nutritionist/patients', { method: 'POST', body: JSON.stringify({ name }) }),
   getNutritionistPatient: (id: number) => nutriReq<NutritionistPatientDetail>(`/nutritionist/patients/${id}`),
-  setPatientNextVisit: (id: number, nextVisitAt: string, nextVisitNote: string) =>
-    nutriReq<{ nextVisitAt: string; nextVisitNote: string }>(`/nutritionist/patients/${id}/next-visit`, { method: 'PUT', body: JSON.stringify({ nextVisitAt, nextVisitNote }) }),
+  addPatientAppointment: (id: number, at: string, note: string) =>
+    nutriReq<Appointment[]>(`/nutritionist/patients/${id}/appointments`, { method: 'POST', body: JSON.stringify({ at, note }) }),
+  deletePatientAppointment: (id: number, appointmentId: number) =>
+    nutriReq<Appointment[]>(`/nutritionist/patients/${id}/appointments/${appointmentId}`, { method: 'DELETE' }),
+  addPatientGoal: (id: number, level: GoalLevel, text: string, targetDate: string) =>
+    nutriReq<Goal[]>(`/nutritionist/patients/${id}/goals`, { method: 'POST', body: JSON.stringify({ level, text, targetDate }) }),
+  deletePatientGoal: (id: number, goalId: number) =>
+    nutriReq<Goal[]>(`/nutritionist/patients/${id}/goals/${goalId}`, { method: 'DELETE' }),
+  setPatientPlan: (id: number, items: PlanItem[]) =>
+    nutriReq<PlanItem[]>(`/nutritionist/patients/${id}/plan`, { method: 'PUT', body: JSON.stringify({ items }) }),
   getPatientReport: (id: number, from: string, to: string) => nutriReq<Report>(`/nutritionist/patients/${id}/report?from=${from}&to=${to}`),
   getPatientReportMacros: (id: number, from: string, to: string) => nutriReq<ReportMacros>(`/nutritionist/patients/${id}/report/macros?from=${from}&to=${to}`),
   getPatientMessages: (id: number) => nutriReq<Message[]>(`/nutritionist/patients/${id}/messages`),

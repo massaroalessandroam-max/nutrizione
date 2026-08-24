@@ -89,6 +89,47 @@ export async function initDb(): Promise<void> {
     // colonna già presente
   }
 
+  // Appuntamenti: sostituisce next_visit_at/next_visit_note (singolo campo
+  // sovrascrivibile) con uno storico vero — più voci, passate e future.
+  // Backfill una tantum: solo alla primissima creazione della tabella si
+  // porta dentro l'eventuale appuntamento singolo già impostato, altrimenti
+  // ad ogni riavvio lo riaggiungerebbe anche dopo che è stato cancellato.
+  const { rows: appointmentsTableRows } = await db.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'appointments'");
+  const appointmentsTableExisted = appointmentsTableRows.length > 0;
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      patient_id INTEGER NOT NULL,
+      at TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+  `);
+  if (!appointmentsTableExisted) {
+    const { rows: withNextVisit } = await db.execute("SELECT id, next_visit_at, next_visit_note FROM patients WHERE next_visit_at != ''");
+    for (const p of withNextVisit as any[]) {
+      await db.execute({
+        sql: 'INSERT INTO appointments (patient_id, at, note, created_at) VALUES (?, ?, ?, ?)',
+        args: [p.id, p.next_visit_at, p.next_visit_note, new Date().toISOString()],
+      });
+    }
+  }
+
+  // Obiettivi macro (lungo termine) e micro (breve termine) — testo libero
+  // + scadenza: un obiettivo può essere di peso ma anche "correre una
+  // maratona" o "raggiungere una taglia", quindi niente valore numerico da
+  // tracciare, solo descrizione e data entro cui raggiungerlo.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS goals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      patient_id INTEGER NOT NULL,
+      level TEXT NOT NULL,
+      text TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS patient_sessions (
       token_hash TEXT PRIMARY KEY,

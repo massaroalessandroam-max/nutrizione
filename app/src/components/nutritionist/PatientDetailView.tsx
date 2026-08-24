@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import type { NutritionistPatientDetail, NutritionistTeamMember, Message } from '../../types';
+import { useEffect, useState } from 'react';
+import type { NutritionistPatientDetail, NutritionistTeamMember, Message, GoalLevel } from '../../types';
 import { MEAL_ORDER } from '../../types';
 import { badgeClass } from '../../lib/tone';
 import { MEAL_LABEL, MOOD_EMOJI, formatDateLabel } from '../../lib/mealMeta';
 import { DAY_LABEL } from '../../lib/habitMeta';
-import { BackArrowIcon } from '../../icons';
-import { api, type Report } from '../../api';
+import { MAX_PER_WEEK_LABEL, MAX_PER_WEEK_SELECT_OPTIONS } from '../../lib/planMeta';
+import { BackArrowIcon, PlusIcon, TrashIcon } from '../../icons';
+import { api, PLAN_CATEGORIES, type Report, type PlanItem } from '../../api';
 import { ShareActions } from '../ShareActions';
 
 type Tab = 'diario' | 'andamento' | 'abitudini' | 'piano' | 'report' | 'messaggi';
@@ -24,7 +25,11 @@ interface Props {
   messages: Message[] | null;
   team: NutritionistTeamMember[] | null;
   onBack: () => void;
-  onSetNextVisit: (at: string, note: string) => Promise<void>;
+  onAddAppointment: (at: string, note: string) => Promise<void>;
+  onDeleteAppointment: (appointmentId: number) => Promise<void>;
+  onAddGoal: (level: GoalLevel, text: string, targetDate: string) => Promise<void>;
+  onDeleteGoal: (goalId: number) => Promise<void>;
+  onSavePlan: (items: PlanItem[]) => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
   onSetOwner: (nutritionistId: number | null) => Promise<void>;
 }
@@ -33,11 +38,17 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function PatientDetailView({ patient, messages, team, onBack, onSetNextVisit, onSendMessage, onSetOwner }: Props) {
+export function PatientDetailView({
+  patient, messages, team, onBack, onAddAppointment, onDeleteAppointment, onAddGoal, onDeleteGoal, onSavePlan, onSendMessage, onSetOwner,
+}: Props) {
   const [tab, setTab] = useState<Tab>('diario');
-  const [visitAt, setVisitAt] = useState('');
-  const [visitNote, setVisitNote] = useState('');
-  const [editingVisit, setEditingVisit] = useState(false);
+  const [apptAt, setApptAt] = useState('');
+  const [apptNote, setApptNote] = useState('');
+  const [goalLevel, setGoalLevel] = useState<GoalLevel>('macro');
+  const [goalText, setGoalText] = useState('');
+  const [goalTargetDate, setGoalTargetDate] = useState('');
+  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [planSaving, setPlanSaving] = useState(false);
   const [newCode, setNewCode] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [reportFrom, setReportFrom] = useState(() => new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));
@@ -45,17 +56,43 @@ export function PatientDetailView({ patient, messages, team, onBack, onSetNextVi
   const [report, setReport] = useState<Report | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
 
+  // Risincronizza solo quando cambia il paziente selezionato, non ad ogni
+  // refresh del dettaglio (altrimenti una modifica in corso qui verrebbe
+  // persa quando un'altra azione, es. aggiungere un appuntamento, ricarica
+  // patient da capo).
+  useEffect(() => {
+    setPlanItems(patient?.plan.items ?? []);
+  }, [patient?.id]);
+
   if (!patient) return <div className="nm-empty-state">Caricamento…</div>;
 
-  const startEditVisit = () => {
-    setVisitAt(patient.nextVisitAt);
-    setVisitNote(patient.nextVisitNote);
-    setEditingVisit(true);
+  const submitAppointment = async () => {
+    if (!apptAt) return;
+    await onAddAppointment(apptAt, apptNote.trim());
+    setApptAt('');
+    setApptNote('');
   };
 
-  const saveVisit = async () => {
-    await onSetNextVisit(visitAt, visitNote);
-    setEditingVisit(false);
+  const submitGoal = async () => {
+    const text = goalText.trim();
+    if (!text || !goalTargetDate) return;
+    await onAddGoal(goalLevel, text, goalTargetDate);
+    setGoalText('');
+    setGoalTargetDate('');
+  };
+
+  const updatePlanItem = (i: number, patch: Partial<PlanItem>) =>
+    setPlanItems((items) => items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const removePlanItem = (i: number) => setPlanItems((items) => items.filter((_, idx) => idx !== i));
+  const addPlanItem = () => setPlanItems((items) => [...items, { name: '', quantity: '', category: '', maxPerWeek: '' }]);
+
+  const savePlan = async () => {
+    setPlanSaving(true);
+    try {
+      await onSavePlan(planItems.filter((it) => it.name.trim()));
+    } finally {
+      setPlanSaving(false);
+    }
   };
 
   const loadReport = async () => {
@@ -139,23 +176,51 @@ export function PatientDetailView({ patient, messages, team, onBack, onSetNextVi
         </div>
       </div>
 
-      <div className="nm-section-label" style={{ marginTop: 16 }}>Prossima visita</div>
-      {editingVisit ? (
-        <div className="nm-plan-item-card">
-          <input className="nm-text-input" type="date" value={visitAt} onChange={(e) => setVisitAt(e.target.value)} />
-          <input className="nm-text-input" style={{ marginTop: 8 }} placeholder="Nota (facoltativa)" value={visitNote} onChange={(e) => setVisitNote(e.target.value)} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <button className="nm-modal-btn nm-modal-btn-secondary" onClick={() => setEditingVisit(false)}>Annulla</button>
-            <button className="nm-modal-btn nm-modal-btn-primary" onClick={saveVisit}>Salva</button>
+      <div className="nm-section-label" style={{ marginTop: 16 }}>Appuntamenti</div>
+      {patient.state.appointments.length === 0 && <div className="nm-hint">Nessun appuntamento ancora.</div>}
+      {patient.state.appointments.map((a) => (
+        <div key={a.id} className="nm-plan-item-card" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong>{formatDateLabel(a.at)}</strong>
+            {a.note && <div className="nm-page-sub" style={{ margin: 0 }}>{a.note}</div>}
           </div>
+          <button className="nm-plan-row-icon-btn" onClick={() => onDeleteAppointment(a.id)} aria-label={`Elimina appuntamento del ${a.at}`}>
+            <TrashIcon size={14} />
+          </button>
         </div>
-      ) : (
-        <button className="nm-plan-item-card" style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }} onClick={startEditVisit}>
-          {patient.nextVisitAt
-            ? <>{formatDateLabel(patient.nextVisitAt)}{patient.nextVisitNote && ` — ${patient.nextVisitNote}`}</>
-            : 'Non impostata — tocca per aggiungerla'}
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        <input className="nm-text-input" type="date" value={apptAt} onChange={(e) => setApptAt(e.target.value)} />
+        <input className="nm-text-input" style={{ flex: 1, minWidth: 140 }} placeholder="Nota (facoltativa)" value={apptNote} onChange={(e) => setApptNote(e.target.value)} />
+        <button className="nm-modal-btn nm-modal-btn-primary" style={{ flex: 'none', padding: '0 16px' }} disabled={!apptAt} onClick={submitAppointment}>
+          <PlusIcon size={14} />
         </button>
-      )}
+      </div>
+
+      <div className="nm-section-label" style={{ marginTop: 20 }}>Obiettivi</div>
+      {patient.state.goals.length === 0 && <div className="nm-hint">Nessun obiettivo ancora.</div>}
+      {patient.state.goals.map((g) => (
+        <div key={g.id} className="nm-plan-item-card" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong>{g.level === 'macro' ? 'Macro' : 'Micro'}</strong> · {g.text}
+            <div className="nm-page-sub" style={{ margin: 0 }}>Entro {formatDateLabel(g.targetDate)}</div>
+          </div>
+          <button className="nm-plan-row-icon-btn" onClick={() => onDeleteGoal(g.id)} aria-label={`Elimina obiettivo ${g.text}`}>
+            <TrashIcon size={14} />
+          </button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        <select className="nm-owner-select" value={goalLevel} onChange={(e) => setGoalLevel(e.target.value as GoalLevel)}>
+          <option value="macro">Macro</option>
+          <option value="micro">Micro</option>
+        </select>
+        <input className="nm-text-input" style={{ flex: 1, minWidth: 140 }} placeholder="Es. Perdere 30kg" value={goalText} onChange={(e) => setGoalText(e.target.value)} />
+        <input className="nm-text-input" type="date" value={goalTargetDate} onChange={(e) => setGoalTargetDate(e.target.value)} />
+        <button className="nm-modal-btn nm-modal-btn-primary" style={{ flex: 'none', padding: '0 16px' }} disabled={!goalText.trim() || !goalTargetDate} onClick={submitGoal}>
+          <PlusIcon size={14} />
+        </button>
+      </div>
 
       <div className="nm-chip-row" style={{ marginTop: 18 }}>
         {TABS.map((t) => (
@@ -239,16 +304,34 @@ export function PatientDetailView({ patient, messages, team, onBack, onSetNextVi
 
       {tab === 'piano' && (
         <div style={{ marginTop: 14 }}>
-          {patient.plan.items.length === 0 && <div className="nm-empty-state">Nessun piano caricato.</div>}
-          {patient.plan.items.map((it, i) => (
-            <div key={i} className="nm-plan-item-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>{it.name}</strong>
-                <span className="nm-page-sub">{it.quantity}</span>
+          {planItems.length === 0 && <div className="nm-empty-state">Nessun alimento nel piano.</div>}
+          {planItems.map((it, i) => (
+            <div key={i} className="nm-plan-item-card" style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="nm-text-input" style={{ flex: 1 }} placeholder="Alimento" value={it.name} onChange={(e) => updatePlanItem(i, { name: e.target.value })} />
+                <button className="nm-plan-row-icon-btn" onClick={() => removePlanItem(i)} aria-label={`Elimina ${it.name || 'alimento'}`}>
+                  <TrashIcon size={14} />
+                </button>
               </div>
-              <div className="nm-page-sub">{it.category || '—'} · {it.maxPerWeek || '—'}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input className="nm-text-input" placeholder="Grammatura" value={it.quantity} onChange={(e) => updatePlanItem(i, { quantity: e.target.value })} />
+                <select className="nm-text-input" value={it.category} onChange={(e) => updatePlanItem(i, { category: e.target.value })}>
+                  <option value="">Altro</option>
+                  {PLAN_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="nm-text-input" value={it.maxPerWeek} onChange={(e) => updatePlanItem(i, { maxPerWeek: e.target.value })}>
+                  {MAX_PER_WEEK_SELECT_OPTIONS.map((o) => <option key={o} value={o}>{MAX_PER_WEEK_LABEL[o]}</option>)}
+                </select>
+              </div>
             </div>
           ))}
+          <button className="nm-onboard-add-btn" onClick={addPlanItem}>
+            <PlusIcon size={14} /> Aggiungi alimento
+          </button>
+          <button className="nm-submit-btn" style={{ marginTop: 14 }} disabled={planSaving} onClick={savePlan}>
+            {planSaving ? 'Salvataggio…' : 'Salva piano'}
+          </button>
+
           {patient.plan.notes.divieti.length > 0 && (
             <>
               <div className="nm-section-label" style={{ marginTop: 14 }}>Divieti</div>

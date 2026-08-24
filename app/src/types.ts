@@ -65,11 +65,27 @@ export interface FastingPref {
   end: string;
 }
 
+export interface Appointment {
+  id: number;
+  at: string;
+  note: string;
+}
+
+export type GoalLevel = 'macro' | 'micro';
+
+export interface Goal {
+  id: number;
+  level: GoalLevel;
+  text: string;
+  targetDate: string;
+}
+
 export interface AppState {
   date: string;
-  // Prossima visita impostata dal nutrizionista, facoltativa — stringa vuota se non impostata.
-  nextVisitAt: string;
-  nextVisitNote: string;
+  // Storico appuntamenti impostati dal nutrizionista (passati e futuri).
+  appointments: Appointment[];
+  // Obiettivi impostati dal nutrizionista — testo libero + scadenza.
+  goals: Goal[];
   // C'è almeno un messaggio del nutrizionista non ancora aperto dal paziente.
   unreadMessages: boolean;
   points: number;
@@ -166,8 +182,6 @@ export interface NutritionistPatientListItem {
 export interface NutritionistPatientDetail {
   id: number;
   name: string;
-  nextVisitAt: string;
-  nextVisitNote: string;
   ownerId: number | null;
   ownerName: string;
   state: AppState;

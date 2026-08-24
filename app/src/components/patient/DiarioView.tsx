@@ -41,6 +41,9 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
   const weekTarget = activeCount * state.week.length;
   const weekPct = `${weekTarget > 0 ? Math.min(100, Math.round((weekDone / weekTarget) * 100)) : 0}%`;
   const visibleMeals = MEAL_ORDER.filter((k) => state.activeMeals.includes(k) || state.meals[k].done);
+  // state.appointments è già ordinato per data crescente — il primo con
+  // data odierna o futura è il prossimo.
+  const nextAppointment = state.appointments.find((a) => a.at >= state.date);
 
   return (
     <div className="nm-section">
@@ -64,12 +67,26 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
         </div>
       </div>
 
-      {state.nextVisitAt && (
+      {nextAppointment && (
         <div className="nm-fast-mini" style={{ marginBottom: 14 }}>
           <ClockIcon size={15} color="var(--teal-700)" />
           <div className="nm-fast-mini-body">
             <div className="nm-fast-mini-title">Prossima visita</div>
-            <div className="nm-fast-mini-sub">{formatDateLabel(state.nextVisitAt)}{state.nextVisitNote ? ` · ${state.nextVisitNote}` : ''}</div>
+            <div className="nm-fast-mini-sub">{formatDateLabel(nextAppointment.at)}{nextAppointment.note ? ` · ${nextAppointment.note}` : ''}</div>
+          </div>
+        </div>
+      )}
+
+      {state.goals.length > 0 && (
+        <div className="nm-fast-mini" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
+          <FlameIcon size={15} color="var(--gold-deep)" />
+          <div className="nm-fast-mini-body">
+            <div className="nm-fast-mini-title">I tuoi obiettivi</div>
+            {state.goals.map((g) => (
+              <div key={g.id} className="nm-fast-mini-sub">
+                {g.level === 'macro' ? 'Macro' : 'Micro'}: {g.text} — entro {formatDateLabel(g.targetDate)}
+              </div>
+            ))}
           </div>
         </div>
       )}
