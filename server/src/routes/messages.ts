@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requirePatient } from '../auth.js';
+import { addEvent } from '../events.js';
 
 export const messagesRouter = Router();
 messagesRouter.use(requirePatient);
@@ -58,5 +59,7 @@ messagesRouter.get('/messages', async (req, res) => {
 messagesRouter.post('/messages', async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ error: 'testo mancante' });
-  res.json(await addMessage(req.patientId!, 'paziente', text));
+  const list = await addMessage(req.patientId!, 'paziente', text);
+  await addEvent(req.patientId!, 'message_from_patient', 'Ha scritto un nuovo messaggio');
+  res.json(list);
 });

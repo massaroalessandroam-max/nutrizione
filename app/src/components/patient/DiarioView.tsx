@@ -68,8 +68,8 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
       </div>
 
       {nextAppointment && (
-        <div className="nm-fast-mini" style={{ marginBottom: 14 }}>
-          <ClockIcon size={15} color="var(--teal-700)" />
+        <div className="nm-appt-banner">
+          <ClockIcon size={17} color="#fff" />
           <div className="nm-fast-mini-body">
             <div className="nm-fast-mini-title">Prossima visita</div>
             <div className="nm-fast-mini-sub">{formatDateLabel(nextAppointment.at)}{nextAppointment.note ? ` · ${nextAppointment.note}` : ''}</div>
@@ -124,6 +124,27 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
             );
           })}
         </div>
+      </div>
+
+      <div className="nm-diario-2col">
+        {state.fastActive ? (
+          <button className="nm-diario-tile" onClick={onToggleFast} disabled={fastToggling}>
+            <ClockIcon size={18} color="var(--teal-700)" />
+            <div className="nm-diario-tile-title">{h}h {String(m).padStart(2, '0')}m</div>
+            <div className="nm-diario-tile-sub">{Math.round(fastPct * 100)}% di 16h — tocca per terminare</div>
+          </button>
+        ) : (
+          <button className="nm-diario-tile" onClick={onToggleFast} disabled={fastToggling}>
+            <ClockIcon size={18} color="var(--ink-soft)" />
+            <div className="nm-diario-tile-title">Digiuno</div>
+            <div className="nm-diario-tile-sub">Tocca per iniziare</div>
+          </button>
+        )}
+        <button className="nm-diario-tile" onClick={onOpenSupplements}>
+          <PillIcon size={18} color="var(--ink-soft)" />
+          <div className="nm-diario-tile-title">Integratori</div>
+          <div className="nm-diario-tile-sub">Registra assunzione</div>
+        </button>
       </div>
 
       <div className="nm-meals">
@@ -183,31 +204,15 @@ export function DiarioView({ state, onOpenMeal, onOpenLogQuick, onToggleFast, fa
           );
         })}
       </div>
+      {/* Spazio per non far finire l'ultimo pasto sotto la CTA fissa. */}
+      <div style={{ height: 68 }} />
 
-      <button className="nm-cta" onClick={onOpenLogQuick}>
-        <PlusIcon size={19} color="#fff" />
-        Registra un pasto
-      </button>
-      <button className="nm-cta-secondary" onClick={onOpenSupplements}>
-        <PillIcon size={15} />
-        Integratori
-      </button>
-
-      {state.fastActive ? (
-        <button className="nm-fast-mini" onClick={onToggleFast} disabled={fastToggling}>
-          <ClockIcon size={15} color="var(--teal-700)" />
-          <div className="nm-fast-mini-body">
-            <div className="nm-fast-mini-title">Digiuno in corso</div>
-            <div className="nm-fast-mini-sub">{h}h {String(m).padStart(2, '0')}m · tocca per terminare</div>
-          </div>
-          <span className="nm-fast-mini-pct">{Math.round(fastPct * 100)}%</span>
+      <div className="nm-cta-sticky">
+        <button className="nm-cta" onClick={onOpenLogQuick}>
+          <PlusIcon size={19} color="#fff" />
+          Registra un pasto
         </button>
-      ) : (
-        <button className="nm-cta-secondary" onClick={onToggleFast} disabled={fastToggling}>
-          <ClockIcon size={15} />
-          Inizia digiuno
-        </button>
-      )}
+      </div>
     </div>
   );
 }

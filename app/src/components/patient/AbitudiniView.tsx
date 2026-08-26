@@ -1,61 +1,26 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
-import type { Habit, HabitWeekDay, Weekday } from '../../types';
-import { CheckIcon, PencilIcon } from '../../icons';
-import { WEEKDAYS, DAY_LABEL, weekdayCodeOf, isDueOn, groupByPeriod, PERIOD_LABEL } from '../../lib/habitMeta';
+import type { Habit, HabitDayItem, HabitWeekDay, Weekday } from '../../types';
+import { CheckIcon, PencilIcon, TrashIcon } from '../../icons';
+import { DAY_LABEL, weekdayCodeOf, isDueOn, groupByPeriod, PERIOD_LABEL, asHabitDef, type HabitDef } from '../../lib/habitMeta';
+import { HabitConfigView } from './HabitConfigView';
 
-interface HabitDef { id?: number; text: string; days: Weekday[]; time: string }
-
-const asDef = (h: Habit): HabitDef => ({ id: h.id, text: h.text, days: h.days, time: h.time });
-
-function DayPicker({ days, onChange }: { days: Weekday[]; onChange: (days: Weekday[]) => void }) {
-  return (
-    <div className="nm-habit-days">
-      {WEEKDAYS.map((d) => (
-        <button
-          key={d}
-          type="button"
-          className={`nm-habit-day ${days.includes(d) ? 'is-on' : ''}`}
-          onClick={() => onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])}
-          aria-label={days.includes(d) ? `Rimuovi ${DAY_LABEL[d]}` : `Aggiungi ${DAY_LABEL[d]}`}
-        >
-          {DAY_LABEL[d]}
-        </button>
-      ))}
-    </div>
-  );
+function daysSummary(days: Weekday[]): string {
+  if (days.length === 0) return 'Ogni giorno';
+  return days.map((d) => DAY_LABEL[d]).join(', ');
 }
 
-interface EditRowProps {
-  habit: Habit;
-  onSave: (patch: Partial<HabitDef>) => void;
-  onDelete: () => void;
-}
-
-function EditRow({ habit, onSave, onDelete }: EditRowProps) {
-  const [text, setText] = useState(habit.text);
-
+function SummaryRow({ habit, onEdit, onDelete }: { habit: Habit; onEdit: () => void; onDelete: () => void }) {
   return (
-    <div className="nm-habit-edit-row">
-      <div className="nm-habit-edit-top">
-        <input
-          className="nm-habit-text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => { if (text.trim() && text.trim() !== habit.text) onSave({ text: text.trim() }); else setText(habit.text); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        />
-        <button className="nm-habit-delete" onClick={onDelete} aria-label={`Elimina ${habit.text}`}>×</button>
+    <div className="nm-habit-summary-row">
+      <div className="nm-habit-summary-main">
+        <div className="nm-habit-summary-text">{habit.text}</div>
+        <div className="nm-habit-summary-meta">
+          {habit.time && `${habit.time} · `}{daysSummary(habit.days)}
+        </div>
       </div>
-      <div className="nm-habit-edit-bottom">
-        <input
-          className="nm-habit-time"
-          type="time"
-          value={habit.time}
-          onChange={(e) => onSave({ time: e.target.value })}
-        />
-        <DayPicker days={habit.days} onChange={(days) => onSave({ days })} />
-      </div>
+      <button className="nm-habit-edit-btn" onClick={onEdit} aria-label={`Modifica ${habit.text}`}><PencilIcon size={15} /></button>
+      <button className="nm-habit-delete" style={{ opacity: 1 }} onClick={onDelete} aria-label={`Elimina ${habit.text}`}><TrashIcon size={15} /></button>
     </div>
   );
 }
@@ -81,12 +46,20 @@ function TodayRow({ habit, onToggle }: { habit: Habit; onToggle: () => void }) {
   );
 }
 
-function TomorrowRow({ habit }: { habit: Habit }) {
+// Riga di sola lettura per domani (non ancora accaduto: spunta sempre
+// tratteggiata) e per un giorno passato della striscia (spunta piena se
+// `done`, così la differenza tra "non ancora dovuto" e "dovuto ma saltato"
+// resta visibile anche nella storia).
+function ReadOnlyRow({ text, time, done }: { text: string; time: string; done: boolean }) {
   return (
     <div className="nm-habit-row">
-      <span className="nm-habit-check" style={{ borderStyle: 'dashed' }} />
-      <span className="nm-habit-text-static">{habit.text}</span>
-      {habit.time && <span className="nm-habit-time-static">{habit.time}</span>}
+      {done ? (
+        <span className="nm-habit-check is-on"><CheckIcon size={12} color="#fff" strokeWidth={3} /></span>
+      ) : (
+        <span className="nm-habit-check" style={{ borderStyle: 'dashed' }} />
+      )}
+      <span className="nm-habit-text-static" style={{ color: done ? 'var(--ink-faint)' : 'var(--ink)', textDecoration: done ? 'line-through' : 'none' }}>{text}</span>
+      {time && <span className="nm-habit-time-static">{time}</span>}
     </div>
   );
 }
@@ -95,33 +68,39 @@ export function AbitudiniView() {
   const [habits, setHabits] = useState<Habit[] | null>(null);
   const [week, setWeek] = useState<HabitWeekDay[] | null>(null);
   const [editing, setEditing] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [newText, setNewText] = useState('');
+  const [configuring, setConfiguring] = useState<HabitDef | 'new' | null>(null);
   const [showTomorrow, setShowTomorrow] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = oggi
+  const [dayDetail, setDayDetail] = useState<HabitDayItem[] | null>(null);
 
   useEffect(() => {
     api.getHabits().then(setHabits).catch(() => setHabits([]));
     api.getHabitsWeek().then(setWeek).catch(() => setWeek([]));
   }, []);
 
+  useEffect(() => {
+    if (selectedDate === null) { setDayDetail(null); return; }
+    setDayDetail(null);
+    api.getHabitsDay(selectedDate).then(setDayDetail).catch(() => setDayDetail([]));
+  }, [selectedDate]);
+
   const refreshWeek = () => { api.getHabitsWeek().then(setWeek).catch(() => {}); };
 
   // Base per ogni salvataggio in blocco: le definizioni correnti (senza lo
   // stato del giorno), su cui aggiungere/rimuovere/modificare una voce.
-  const currentDefs = (): HabitDef[] => (habits ?? []).map(asDef);
+  const currentDefs = (): HabitDef[] => (habits ?? []).map(asHabitDef);
 
   const toggleToday = async (h: Habit) => {
     setHabits(await api.checkHabit(h.id, !h.doneToday));
     refreshWeek();
   };
 
-  const saveField = async (id: number, patch: Partial<HabitDef>) => {
-    const items = currentDefs().map((d) => (d.id === id ? { ...d, ...patch } : d));
+  const saveDraft = async (draft: HabitDef) => {
+    const defs = currentDefs();
+    const items = draft.id !== undefined ? defs.map((d) => (d.id === draft.id ? draft : d)) : [...defs, draft];
     setHabits(await api.saveHabits(items));
-    // "days" cambia anche il conteggio dovuto per i giorni passati nel
-    // grafico (aderenza calcolata sulla configurazione attuale), non solo
-    // per oggi — va rinfrescato a ogni modifica, non solo su check/delete.
-    if (patch.days) refreshWeek();
+    refreshWeek();
+    setConfiguring(null);
   };
 
   const removeHabit = async (id: number) => {
@@ -129,20 +108,15 @@ export function AbitudiniView() {
     refreshWeek();
   };
 
-  const commitAdd = async () => {
-    const text = newText.trim();
-    setAdding(false);
-    setNewText('');
-    if (!text) return;
-    const items = [...currentDefs(), { text, days: [] as Weekday[], time: '' }];
-    setHabits(await api.saveHabits(items));
-    refreshWeek();
-  };
-
-  const closeEditing = async () => {
-    if (adding && newText.trim()) await commitAdd();
-    setEditing(false);
-  };
+  if (configuring !== null) {
+    return (
+      <HabitConfigView
+        habit={configuring === 'new' ? null : configuring}
+        onSave={saveDraft}
+        onCancel={() => setConfiguring(null)}
+      />
+    );
+  }
 
   if (habits === null) {
     return (
@@ -157,6 +131,8 @@ export function AbitudiniView() {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const tomorrowCode = weekdayCodeOf(tomorrow);
   const tomorrowGroups = groupByPeriod(habits.filter((h) => isDueOn(h, tomorrowCode)));
+  const dayDetailGroups = dayDetail ? groupByPeriod(dayDetail.filter((h) => h.due)) : null;
+  const selectedDay = week?.find((d) => d.date === selectedDate);
 
   return (
     <div className="nm-section">
@@ -166,49 +142,56 @@ export function AbitudiniView() {
       {week && week.some((d) => d.dueCount > 0) && (
         <div className="nm-week-card">
           <div className="nm-week-card-title">Aderenza abitudini</div>
-          <div className="nm-page-sub" style={{ marginTop: -4, marginBottom: 4 }}>Ultimi 7 giorni</div>
+          <div className="nm-page-sub" style={{ marginTop: -4, marginBottom: 4 }}>Ultimi 7 giorni — tocca un giorno per vederne le abitudini</div>
           <div className="nm-week-chart">
             {week.map((d) => {
-              const color = d.isToday ? 'var(--gold)' : d.duePct > 0 ? 'var(--teal-700)' : 'var(--neutral-chip)';
-              const labelColor = d.isToday ? 'var(--ink)' : 'var(--ink-faint)';
+              const isSelected = d.isToday ? selectedDate === null : selectedDate === d.date;
+              const color = isSelected ? 'var(--gold)' : d.duePct > 0 ? 'var(--teal-700)' : 'var(--neutral-chip)';
+              const labelColor = isSelected ? 'var(--ink)' : 'var(--ink-faint)';
               const heightPct = d.dueCount === 0 ? 6 : Math.max(6, d.duePct);
               return (
-                <div key={d.date} className="nm-week-day">
+                <button
+                  key={d.date}
+                  className="nm-week-day nm-week-day-btn"
+                  onClick={() => setSelectedDate(d.isToday ? null : d.date)}
+                  aria-label={`Abitudini del ${d.dayLabel}`}
+                >
                   <div className="nm-week-bar-track">
                     <div className="nm-week-bar-fill" style={{ height: `${heightPct}%`, background: color }} />
                   </div>
-                  <span className="nm-week-day-label" style={{ color: labelColor, fontWeight: d.isToday ? 700 : 500 }}>{d.dayLabel}</span>
-                </div>
+                  <span className="nm-week-day-label" style={{ color: labelColor, fontWeight: isSelected ? 700 : 500 }}>{d.dayLabel}</span>
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
-      {editing ? (
+      {selectedDate !== null ? (
+        <>
+          <div className="nm-section-label" style={{ marginTop: 14 }}>{selectedDay?.dayLabel ?? selectedDate}</div>
+          {dayDetailGroups === null ? (
+            <div className="nm-empty-state">Caricamento…</div>
+          ) : dayDetailGroups.length === 0 ? (
+            <div className="nm-empty-state">Nessuna abitudine prevista.</div>
+          ) : (
+            <div className="nm-habit-list">
+              {dayDetailGroups.map(([period, list]) => (
+                <div key={period}>
+                  <div className="nm-section-label">{PERIOD_LABEL[period]}</div>
+                  {list.map((h) => <ReadOnlyRow key={h.id} text={h.text} time={h.time} done={h.done} />)}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : editing ? (
         <div className="nm-habit-list">
           {habits.map((h) => (
-            <EditRow key={h.id} habit={h} onSave={(patch) => saveField(h.id, patch)} onDelete={() => removeHabit(h.id)} />
+            <SummaryRow key={h.id} habit={h} onEdit={() => setConfiguring(asHabitDef(h))} onDelete={() => removeHabit(h.id)} />
           ))}
-
-          {adding ? (
-            <div className="nm-habit-add-row">
-              <span className="nm-habit-check" style={{ borderStyle: 'dashed' }} />
-              <input
-                className="nm-habit-add-input"
-                autoFocus
-                placeholder="Nuova abitudine…"
-                value={newText}
-                onChange={(e) => setNewText(e.target.value)}
-                onBlur={commitAdd}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setNewText(''); setAdding(false); } }}
-              />
-            </div>
-          ) : (
-            <button className="nm-habit-add-trigger" onClick={() => setAdding(true)}>+ Nuova abitudine</button>
-          )}
-
-          <button className="nm-btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={closeEditing}>Salva</button>
+          <button className="nm-habit-add-trigger" onClick={() => setConfiguring('new')}>+ Nuova abitudine</button>
+          <button className="nm-btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={() => setEditing(false)}>Fatto</button>
         </div>
       ) : (
         <>
@@ -240,7 +223,7 @@ export function AbitudiniView() {
               ) : tomorrowGroups.map(([period, list]) => (
                 <div key={period}>
                   <div className="nm-section-label">{PERIOD_LABEL[period]}</div>
-                  {list.map((h) => <TomorrowRow key={h.id} habit={h} />)}
+                  {list.map((h) => <ReadOnlyRow key={h.id} text={h.text} time={h.time} done={false} />)}
                 </div>
               ))}
             </div>

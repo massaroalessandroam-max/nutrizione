@@ -1,4 +1,5 @@
 import type { AppState } from '../../types';
+import { FlameIcon, StarIcon, CheckCircleIcon } from '../../icons';
 
 interface Props {
   state: AppState;
@@ -15,14 +16,17 @@ export function PremiView({ state, onDayClick }: Props) {
 
       <div className="nm-stat-row">
         <div className="nm-stat-card">
+          <div className="nm-stat-icon" style={{ background: 'var(--gold-tint)' }}><FlameIcon size={16} /></div>
           <div className="nm-stat-value" style={{ color: 'var(--gold-text)' }}>{state.streak}</div>
           <div className="nm-stat-label">giorni di fila</div>
         </div>
         <div className="nm-stat-card">
+          <div className="nm-stat-icon" style={{ background: 'var(--good-bg)' }}><StarIcon size={16} color="var(--teal-700)" /></div>
           <div className="nm-stat-value" style={{ color: 'var(--teal-900)' }}>{state.points}</div>
           <div className="nm-stat-label">punti totali</div>
         </div>
         <div className="nm-stat-card">
+          <div className="nm-stat-icon" style={{ background: 'var(--good-bg)' }}><CheckCircleIcon size={16} /></div>
           <div className="nm-stat-value" style={{ color: 'var(--teal-700)' }}>{state.badges.filter((b) => b.earned).length}</div>
           <div className="nm-stat-label">obiettivi</div>
         </div>

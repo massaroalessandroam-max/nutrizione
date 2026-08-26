@@ -11,11 +11,9 @@ interface Props {
   activePatientId: number | null;
   onSelect: (id: number) => void;
   onCreatePatient: (name: string) => Promise<{ id: number; name: string; accessCode: string }>;
-  onOpenTeam: () => void;
-  onOpenDashboard: () => void;
 }
 
-export function PatientListView({ patients, activePatientId, onSelect, onCreatePatient, onOpenTeam, onOpenDashboard }: Props) {
+export function PatientListView({ patients, activePatientId, onSelect, onCreatePatient }: Props) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [createdCode, setCreatedCode] = useState<{ name: string; code: string } | null>(null);
@@ -84,17 +82,9 @@ export function PatientListView({ patients, activePatientId, onSelect, onCreateP
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-          <button className="nm-onboard-add-btn" style={{ flex: 1 }} onClick={() => setAdding(true)}>
-            <PlusIcon size={14} /> Aggiungi paziente
-          </button>
-          <button className="nm-onboard-add-btn" style={{ flex: 1 }} onClick={onOpenDashboard}>
-            Dashboard
-          </button>
-          <button className="nm-onboard-add-btn" style={{ flex: 1 }} onClick={onOpenTeam}>
-            Nutrizionisti dello studio
-          </button>
-        </div>
+        <button className="nm-onboard-add-btn" style={{ marginTop: 14, width: '100%' }} onClick={() => setAdding(true)}>
+          <PlusIcon size={14} /> Aggiungi paziente
+        </button>
       )}
 
       <div className="nm-patient-list" style={{ marginTop: 14 }}>

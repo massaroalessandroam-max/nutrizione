@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { db, ensurePatientAppState } from '../db.js';
 import { newAccessCode, hashAccessCode, newTempPassword, hashPassword, requireNutritionist } from '../auth.js';
 import { buildState } from './state.js';
-import { buildReport, buildMacros } from './report.js';
+import { buildReport, buildMacros, shiftDate } from './report.js';
 import { loadHabits } from './habits.js';
 import { loadPlanItems, loadPlanNotes, savePlanItems } from './plan.js';
 import { loadMessages, addMessage, markMessagesRead } from './messages.js';
 import { addAppointment, deleteAppointment } from './appointments.js';
 import { GOAL_LEVELS, addGoal, deleteGoal, type GoalLevel } from './goals.js';
+import { addEvent, loadRecentActivity } from '../events.js';
 
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
@@ -76,6 +77,7 @@ nutritionistRouter.post('/patients', async (req, res) => {
   });
   const patientId = Number(result.lastInsertRowid);
   await ensurePatientAppState(patientId);
+  await addEvent(patientId, 'patient_created', 'Nuovo paziente aggiunto');
 
   // Il codice in chiaro si vede SOLO in questa risposta — dopo è solo hash.
   res.json({ id: patientId, name, accessCode: code });
@@ -133,7 +135,9 @@ nutritionistRouter.post('/patients/:id/appointments', async (req, res) => {
   const at = String(req.body?.at ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(at)) return res.status(400).json({ error: 'data non valida' });
   const note = String(req.body?.note ?? '').trim();
-  res.json(await addAppointment(patientId, at, note));
+  const list = await addAppointment(patientId, at, note);
+  await addEvent(patientId, 'appointment_created', `Nuovo appuntamento fissato per il ${at}`);
+  res.json(list);
 });
 
 nutritionistRouter.delete('/patients/:id/appointments/:appointmentId', async (req, res) => {
@@ -237,6 +241,21 @@ nutritionistRouter.post('/team/:id/reset-password', async (req, res) => {
   res.json({ password });
 });
 
+// Spezza [from,to] in bucket settimanali (ultimo bucket accorciato se il
+// resto non è multiplo di 7) per il grafico "Andamento Aderenza Globale":
+// stessa buildReport già usata per la finestra singola, solo chiamata una
+// volta per paziente per bucket invece che una volta sola sull'intervallo.
+export function splitIntoWeeklyBuckets(from: string, to: string): Array<{ from: string; to: string }> {
+  const buckets: Array<{ from: string; to: string }> = [];
+  let cursor = from;
+  while (cursor <= to) {
+    const end = shiftDate(cursor, 6);
+    buckets.push({ from: cursor, to: end > to ? to : end });
+    cursor = shiftDate(cursor, 7);
+  }
+  return buckets;
+}
+
 // Aderenza di ogni paziente nel periodo, col relativo titolare — il client
 // aggrega/filtra per nutrizionista da qui, non serve un parametro dedicato:
 // stessa aderenza-nel-periodo già calcolata per il report del singolo
@@ -274,5 +293,18 @@ nutritionistRouter.get('/dashboard', async (req, res) => {
     };
   }));
 
-  res.json({ from, to, patients: list });
+  // ponytail: nessuna cache — O(pazienti × bucket settimanali) chiamate
+  // sequenziali a buildReport, accettabile alla scala di uno studio; da
+  // rivedere (memoizzazione o tabella aderenza-giornaliera materializzata)
+  // se il numero di pazienti o l'ampiezza del range crescono molto.
+  const trend = await Promise.all(splitIntoWeeklyBuckets(from, to).map(async (bucket) => ({
+    from: bucket.from,
+    to: bucket.to,
+    patients: await Promise.all(patients.map(async (p) => ({
+      id: p.id,
+      adherencePct: (await buildReport(p.id, bucket.from, bucket.to)).adherencePct,
+    }))),
+  })));
+
+  res.json({ from, to, patients: list, trend, recentActivity: await loadRecentActivity() });
 });

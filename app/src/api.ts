@@ -1,6 +1,6 @@
 import type {
   AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember, StudioDashboard,
-  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, Weekday, Appointment, Goal, GoalLevel,
+  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, HabitDayItem, DayPeriod, Weekday, Appointment, Goal, GoalLevel,
 } from './types';
 
 const PATIENT_TOKEN_KEY = 'nm_patient_token';
@@ -105,7 +105,8 @@ export const api = {
   deleteChefCombo: (id: number) => req<ChefCombo[]>(`/chef/combos/${id}`, { method: 'DELETE' }),
   getHabits: () => req<Habit[]>('/habits'),
   getHabitsWeek: () => req<HabitWeekDay[]>('/habits/week'),
-  saveHabits: (items: Array<{ id?: number; text: string; days: Weekday[]; time: string }>) =>
+  getHabitsDay: (date: string) => req<HabitDayItem[]>(`/habits/day?date=${date}`),
+  saveHabits: (items: Array<{ id?: number; text: string; days: Weekday[]; time: string; category: DayPeriod | null }>) =>
     req<Habit[]>('/habits', { method: 'POST', body: JSON.stringify({ items }) }),
   checkHabit: (id: number, done: boolean) =>
     req<Habit[]>(`/habits/${id}/check`, { method: 'PUT', body: JSON.stringify({ done }) }),

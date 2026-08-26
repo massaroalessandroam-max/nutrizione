@@ -30,6 +30,7 @@
      restare dentro i suoi bordi (absolute, come prima), non attaccata al
      fondo dello schermo del browser. */
   .nm-bottom-nav { position: absolute; left: 0; right: 0; transform: none; max-width: none; }
+  .nm-cta-sticky { position: absolute; left: 0; right: 0; transform: none; max-width: none; }
 }
 
 .nm-patient-body { padding-bottom: 88px; }
@@ -159,6 +160,15 @@
 .nm-fast-mini-sub { font-size: 11px; color: var(--ink-faint); }
 .nm-fast-mini-pct { font-size: 12.5px; font-weight: 700; color: var(--teal-700); }
 
+/* Banner prossima visita — a piena larghezza, colore pieno (stesso
+   gradiente della ring card) per distinguerlo dalle pillole secondarie. */
+.nm-appt-banner {
+  background: var(--gradient-ring); color: #fff; border-radius: 16px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.nm-appt-banner .nm-fast-mini-title { color: #fff; }
+.nm-appt-banner .nm-fast-mini-sub { color: rgba(255,255,255,.78); }
+
 /* ===== CTA ===== */
 .nm-cta {
   margin-top: 16px; width: 100%; background: var(--teal-700); border: none;
@@ -172,6 +182,24 @@
   cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
 }
 
+/* "Registra un pasto" fissa sopra la bottom nav — stessa tecnica di
+   posizionamento di .nm-bottom-nav (fixed su mobile reale, absolute dentro
+   la card quando la shell diventa bordata da tablet in su). */
+.nm-cta-sticky {
+  position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 452px; padding: 0 20px; z-index: 5;
+}
+.nm-cta-sticky .nm-cta { margin-top: 0; }
+
+/* Riga a 2 colonne (digiuno + integratori) sotto l'anello. */
+.nm-diario-2col { display: flex; gap: 10px; margin: 14px 0; }
+.nm-diario-tile {
+  flex: 1; background: var(--card); border: 1px solid var(--line-soft); border-radius: 16px;
+  padding: 13px; text-align: center; cursor: pointer;
+}
+.nm-diario-tile-title { font-size: 13.5px; font-weight: 700; margin-top: 6px; }
+.nm-diario-tile-sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+
 /* ===== Premi ===== */
 .nm-page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
 .nm-page-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
@@ -182,6 +210,10 @@
 }
 .nm-stat-value { font-size: 28px; font-weight: 700; }
 .nm-stat-label { font-size: 11.5px; color: var(--ink-soft); }
+.nm-stat-icon {
+  width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center;
+  justify-content: center; margin: 0 auto 8px;
+}
 
 .nm-week-card {
   background: var(--card); border-radius: 20px; padding: 17px; border: 1px solid var(--line-soft);
@@ -564,6 +596,29 @@
   border-radius: 14px; padding: 12px; font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 14px;
 }
 
+/* Card selezionabili Mattina/Pomeriggio/Sera in "Configura Abitudine" —
+   stesso linguaggio on/off delle card orari pasto dell'onboarding. */
+.nm-habit-category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 10px; }
+.nm-habit-category-card {
+  border: 1.5px solid var(--line-medium); border-radius: 14px; padding: 13px 8px; text-align: center;
+  background: var(--card); color: var(--ink-soft); font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.nm-habit-category-card.is-on { border-color: var(--teal-700); background: var(--good-bg); color: var(--teal-900); }
+
+/* Riepilogo di sola visualizzazione per un'abitudine (sostituisce l'EditRow
+   inline: la modifica avviene nella schermata "Configura Abitudine"). */
+.nm-habit-summary-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft);
+}
+.nm-habit-summary-row:last-child { border-bottom: none; }
+.nm-habit-summary-main { flex: 1; min-width: 0; }
+.nm-habit-summary-text { font-size: 14.5px; font-weight: 500; }
+.nm-habit-summary-meta { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+.nm-habit-edit-btn {
+  flex: none; border: none; background: none; color: var(--ink-faint); cursor: pointer; padding: 4px;
+}
+.nm-habit-edit-btn:hover { color: var(--teal-700); }
+
 .nm-onboard-add-btn {
   margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; border: 1.5px dashed var(--line-strong); border-radius: 10px; background: transparent;
@@ -572,6 +627,13 @@
 .nm-onboard-fast-range { display: flex; gap: 12px; margin-top: 10px; }
 .nm-onboard-fast-range > div { flex: 1; }
 .nm-onboard-fast-label { font-size: 12px; color: var(--ink-faint); margin-bottom: 4px; }
+
+/* Anteprima di sola lettura di Regole generali + Divieti, sopra le
+   textarea di modifica — icona diversa a seconda della provenienza del
+   testo, non un editing riga-per-riga: le textarea restano l'unico modo
+   per modificare. */
+.nm-rules-card { background: var(--card); border: 1px solid var(--line-soft); border-radius: 16px; padding: 14px; margin-top: 10px; }
+.nm-rules-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13.5px; }
 
 .nm-plan-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
 .nm-plan-item-card { border: 1.5px solid var(--line-medium); border-radius: 14px; padding: 10px; margin-bottom: 9px; background: var(--card); }
@@ -670,6 +732,7 @@
   flex: 1.4; background: var(--teal-700); border: none; color: #fff;
   border-radius: 14px; padding: 14px; font-weight: 600; font-size: 14px; cursor: pointer;
 }
+.nm-btn-primary:disabled { background: var(--line-strong); cursor: default; }
 
 /* ===== Toast ===== */
 .nm-toast {
@@ -678,6 +741,14 @@
   font-size: 13.5px; font-weight: 500; box-shadow: var(--shadow-toast); animation: nm-rise .3s ease;
   display: flex; align-items: center; gap: 8px; white-space: nowrap;
 }
+
+/* ===== Messaggi ===== */
+.nm-msg-list { display: flex; flex-direction: column; gap: 8px; }
+.nm-msg-bubble { max-width: 80%; border-radius: 16px; padding: 10px 13px; }
+.nm-msg-bubble.is-mine { align-self: flex-end; background: var(--good-bg); border-bottom-right-radius: 4px; }
+.nm-msg-bubble.is-theirs { align-self: flex-start; background: var(--card); border: 1px solid var(--line-soft); border-bottom-left-radius: 4px; }
+.nm-msg-text { font-size: 14px; }
+.nm-msg-time { font-size: 10.5px; color: var(--ink-faint); margin-top: 4px; }
 
 /* ===== Modal ===== */
 .nm-modal-overlay {
@@ -707,17 +778,48 @@
 @keyframes nm-spin { to { transform: rotate(360deg); } }
 
 /* ===== Nutritionist =====
-   Su mobile: una schermata alla volta (lista O dettaglio), come il resto
-   dell'app — .is-detail-active decide quale. Da 900px in su (uso da
-   desktop) diventa un vero layout a due colonne, lista+dettaglio sempre
-   affiancati: la classe .is-detail-active smette di avere effetto perché
-   la media query sotto forza entrambi i pannelli visibili. */
+   Un'unica shell con sidebar persistente (Dashboard/Pazienti/Team) da
+   desktop, tab in alto da mobile — a differenza di prima, "Dashboard" e
+   "Team" non sostituiscono più l'intera schermata con un pulsante
+   "indietro": sono destinazioni alla pari di "Pazienti" dentro lo stesso
+   guscio. Dentro "Pazienti" resta il layout a due colonne di sempre:
+   su mobile una schermata alla volta (lista O dettaglio, .is-detail-active
+   decide quale), da 900px in su lista+dettaglio sempre affiancati. */
 .nm-nutri-body { padding: 6px 20px 24px; }
 
 .nm-nutri-page { align-items: stretch; }
-.nm-nutri-shell {
+.nm-nutri-app-shell {
   width: 100%; min-height: 100vh; display: flex; flex-direction: column; background: var(--app-surface);
 }
+.nm-nutri-navrail { display: none; }
+.nm-nutri-content { flex: 1; min-width: 0; }
+
+@media (min-width: 900px) {
+  .nm-nutri-page { padding: 28px; justify-content: center; align-items: flex-start; }
+  .nm-nutri-app-shell {
+    flex-direction: row; max-width: 1180px; min-height: 760px;
+    border-radius: 24px; box-shadow: var(--shadow-shell); overflow: hidden;
+  }
+  .nm-nutri-navrail {
+    display: flex !important; flex-direction: column; width: 208px; flex: none;
+    border-right: 1px solid var(--line-soft); padding: 22px 14px;
+  }
+  .nm-nutri-mobile-tabs { display: none; }
+  .nm-nutri-mobile-logout { display: none; }
+  .nm-nutri-content { max-height: 100vh; overflow-y: auto; }
+}
+
+.nm-nutri-navrail-brand { font-weight: 700; font-size: 15.5px; padding: 0 12px; margin-bottom: 20px; }
+.nm-nutri-navrail-item {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; border: none;
+  background: none; text-align: left; font-weight: 600; font-size: 14px; color: var(--ink-soft); cursor: pointer;
+}
+.nm-nutri-navrail-item.is-on { background: var(--good-bg); color: var(--teal-900); }
+.nm-nutri-navrail-logout { margin-top: auto; }
+.nm-nutri-mobile-tabs { margin: 16px 20px 0; }
+.nm-nutri-mobile-logout { margin: 0 20px 16px; }
+
+.nm-nutri-shell { width: 100%; height: 100%; display: flex; flex-direction: column; }
 .nm-nutri-sidebar { width: 100%; display: flex; flex-direction: column; min-height: 100vh; }
 .nm-nutri-sidebar .nm-nutri-body { flex: 1; }
 .nm-nutri-logout { flex: none; margin: 0 20px 24px; }
@@ -726,11 +828,7 @@
 .nm-nutri-shell.is-detail-active .nm-nutri-main { display: flex; }
 
 @media (min-width: 900px) {
-  .nm-nutri-page { padding: 28px; justify-content: center; align-items: flex-start; }
-  .nm-nutri-shell {
-    flex-direction: row; max-width: 1180px; min-height: 760px;
-    border-radius: 24px; box-shadow: var(--shadow-shell); overflow: hidden;
-  }
+  .nm-nutri-shell { flex-direction: row; height: 100%; }
   .nm-nutri-sidebar {
     display: flex !important; width: 380px; flex: none;
     border-right: 1px solid var(--line-soft); max-height: 100vh; overflow-y: auto;
@@ -740,21 +838,16 @@
   .nm-nutri-main .nm-back-btn { display: none; }
 }
 
-/* Schermate a colonna singola (Dashboard, Team) aperte da fuori la lista
-   pazienti: stesso trattamento desktop di nm-nutri-shell (largo, centrato),
-   ma senza la colonna sidebar — qui c'è un solo pannello di contenuto. */
-.nm-nutri-solo-shell {
-  width: 100%; min-height: 100vh; display: flex; flex-direction: column; background: var(--app-surface);
-}
-.nm-nutri-solo-shell .nm-nutri-body { flex: 1; }
-@media (min-width: 900px) {
-  .nm-nutri-solo-shell {
-    max-width: 1180px; min-height: 760px;
-    border-radius: 24px; box-shadow: var(--shadow-shell); overflow: hidden;
-    max-height: 100vh; overflow-y: auto;
-  }
-  .nm-nutri-solo-shell .nm-nutri-body { max-width: 720px; margin: 0 auto; width: 100%; }
-}
+/* Feed "Attività Recenti" — riusa la card generica, non un componente
+   timeline dedicato: un'icona rotonda per tipo di evento e il testo. */
+.nm-activity-list { display: flex; flex-direction: column; gap: 8px; }
+.nm-activity-row { display: flex; align-items: flex-start; gap: 10px; background: var(--card); border: 1px solid var(--line-soft); border-radius: 14px; padding: 11px 13px; }
+.nm-activity-icon { flex: none; width: 30px; height: 30px; border-radius: 999px; background: var(--good-bg); display: flex; align-items: center; justify-content: center; }
+.nm-activity-body { flex: 1; min-width: 0; }
+.nm-activity-name { font-weight: 600; font-size: 13.5px; }
+.nm-activity-message { font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
+.nm-activity-time { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
+
 .nm-nutri-stats { display: flex; gap: 9px; margin-bottom: 16px; }
 .nm-nutri-stat {
   flex: 1; border-radius: 16px; padding: 14px;

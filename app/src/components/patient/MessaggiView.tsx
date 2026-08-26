@@ -30,21 +30,13 @@ export function MessaggiView({ onMessagesOpened }: Props) {
       <div className="nm-page-title">Messaggi</div>
       <div className="nm-page-sub">Scrivi al tuo nutrizionista, ti risponderà da qui.</div>
 
-      <div className="nm-logged-foods" style={{ marginTop: 16 }}>
+      <div className="nm-msg-list" style={{ marginTop: 16 }}>
         {messages === null && <div className="nm-empty-state">Caricamento…</div>}
         {messages?.length === 0 && <div className="nm-empty-state">Nessun messaggio ancora — scrivi il primo.</div>}
         {messages?.map((m) => (
-          <div
-            key={m.id}
-            className="nm-plan-item-card"
-            style={{
-              marginLeft: m.sender === 'paziente' ? '20%' : 0,
-              marginRight: m.sender === 'paziente' ? 0 : '20%',
-              background: m.sender === 'paziente' ? 'var(--good-bg)' : 'var(--card)',
-            }}
-          >
-            <div>{m.text}</div>
-            <div className="nm-page-sub" style={{ marginTop: 4 }}>{new Date(m.createdAt).toLocaleString('it-IT')}</div>
+          <div key={m.id} className={`nm-msg-bubble ${m.sender === 'paziente' ? 'is-mine' : 'is-theirs'}`}>
+            <div className="nm-msg-text">{m.text}</div>
+            <div className="nm-msg-time">{new Date(m.createdAt).toLocaleString('it-IT')}</div>
           </div>
         ))}
       </div>

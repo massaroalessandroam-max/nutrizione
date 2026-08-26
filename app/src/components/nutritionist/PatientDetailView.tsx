@@ -382,17 +382,13 @@ export function PatientDetailView({
 
       {tab === 'messaggi' && (
         <div style={{ marginTop: 14 }}>
-          <div className="nm-logged-foods">
+          <div className="nm-msg-list">
             {messages === null && <div className="nm-empty-state">Caricamento…</div>}
             {messages?.length === 0 && <div className="nm-empty-state">Nessun messaggio ancora.</div>}
             {messages?.map((m) => (
-              <div
-                key={m.id}
-                className="nm-plan-item-card"
-                style={{ marginLeft: m.sender === 'nutrizionista' ? '20%' : 0, marginRight: m.sender === 'nutrizionista' ? 0 : '20%', background: m.sender === 'nutrizionista' ? 'var(--good-bg)' : 'var(--card)' }}
-              >
-                <div>{m.text}</div>
-                <div className="nm-page-sub" style={{ marginTop: 4 }}>{new Date(m.createdAt).toLocaleString('it-IT')}</div>
+              <div key={m.id} className={`nm-msg-bubble ${m.sender === 'nutrizionista' ? 'is-mine' : 'is-theirs'}`}>
+                <div className="nm-msg-text">{m.text}</div>
+                <div className="nm-msg-time">{new Date(m.createdAt).toLocaleString('it-IT')}</div>
               </div>
             ))}
           </div>

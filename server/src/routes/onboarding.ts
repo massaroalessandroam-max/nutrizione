@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { buildState, DEFAULT_MEAL_TIME, FIXED_SCHEDULE_MEALS } from './state.js';
 import { requirePatient } from '../auth.js';
+import { addEvent } from '../events.js';
 
 export const onboardingRouter = Router();
 onboardingRouter.use(requirePatient);
@@ -43,6 +44,7 @@ onboardingRouter.post('/onboarding', async (req, res) => {
           WHERE patient_id = ?`,
     args: [name, fastingEnabled ? 1 : 0, fastingStart, fastingEnd, patientId],
   });
+  await addEvent(patientId, 'onboarding_completed', 'Ha completato l\'onboarding');
 
   res.json(await buildState(patientId));
 });

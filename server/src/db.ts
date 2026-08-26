@@ -330,6 +330,14 @@ export async function initDb(): Promise<void> {
   } catch {
     // colonna già presente
   }
+  // Categoria scelta esplicitamente (mattina/pomeriggio/sera) dalla nuova
+  // schermata "Configura Abitudine" — NULL per le abitudini create prima:
+  // si continua a derivarla dall'orario lato client, come già accadeva.
+  try {
+    await db.execute('ALTER TABLE habits ADD COLUMN category TEXT');
+  } catch {
+    // colonna già presente
+  }
   // Una spunta per abitudine/giorno. Il conteggio settimanale è a finestra
   // mobile di 7 giorni (stessa convenzione di loadWeekFoods per il piano),
   // non settimana solare.
@@ -350,6 +358,19 @@ export async function initDb(): Promise<void> {
     CREATE TABLE IF NOT EXISTS food_category_weights (
       food_text TEXT PRIMARY KEY,
       weights_json TEXT NOT NULL
+    );
+  `);
+
+  // Log eventi per il feed "Attività Recenti" della dashboard studio —
+  // scrittura solo in punti già esistenti (nuovo paziente, onboarding,
+  // appuntamento, messaggio paziente), niente tracking speculativo.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      patient_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL
     );
   `);
 

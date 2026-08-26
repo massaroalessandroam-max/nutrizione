@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { StudioDashboard, StudioDashboardPatient, NutritionistTeamMember } from '../../types';
-import { BackArrowIcon } from '../../icons';
+import type { StudioDashboard, StudioDashboardPatient, DashboardTrendBucket, DashboardActivityItem, NutritionistTeamMember } from '../../types';
+import { PlusIcon, CheckCircleIcon, ClockIcon, NavIcon } from '../../icons';
 import { api } from '../../api';
+import { formatRelativeTime } from '../../lib/relativeTime';
 
 interface Props {
   team: NutritionistTeamMember[] | null;
-  onBack: () => void;
 }
 
 interface OwnerStats { ownerId: number | null; ownerName: string; count: number; avgAdherence: number; totalMeals: number; totalMessages: number }
@@ -33,7 +33,30 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function DashboardView({ team, onBack }: Props) {
+// Aderenza media di un bucket, ristretta agli id pazienti visibili nel
+// filtro corrente (null = tutti) — stessa media semplice già usata altrove
+// nella dashboard, solo per bucket invece che per l'intero periodo.
+function bucketAvg(bucket: DashboardTrendBucket, patientIds: number[] | null): number {
+  const relevant = patientIds ? bucket.patients.filter((p) => patientIds.includes(p.id)) : bucket.patients;
+  if (!relevant.length) return 0;
+  return Math.round(relevant.reduce((s, p) => s + p.adherencePct, 0) / relevant.length);
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+}
+
+function activityIcon(type: string) {
+  switch (type) {
+    case 'patient_created': return <PlusIcon size={14} color="var(--teal-700)" />;
+    case 'appointment_created': return <ClockIcon size={14} color="var(--teal-700)" />;
+    case 'message_from_patient': return <NavIcon name="messaggi" color="var(--teal-700)" />;
+    default: return <CheckCircleIcon size={14} />;
+  }
+}
+
+export function DashboardView({ team }: Props) {
   const [from, setFrom] = useState(() => new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = useState(todayIso());
   const [data, setData] = useState<StudioDashboard | null>(null);
@@ -66,12 +89,13 @@ export function DashboardView({ team, onBack }: Props) {
     ? []
     : patients.filter((p) => String(p.ownerId ?? 'none') === ownerFilter).sort((a, b) => a.adherencePct - b.adherencePct);
 
+  // null = nessun filtro attivo (tutti i pazienti contano nel trend/feed).
+  const scopedIds = ownerFilter === 'all' ? null : filteredPatients.map((p) => p.id);
+  const trend = data?.trend ?? [];
+  const activity = (data?.recentActivity ?? []).filter((a) => scopedIds === null || scopedIds.includes(a.patientId));
+
   return (
     <div>
-      <button className="nm-back-btn" onClick={onBack}>
-        <BackArrowIcon />Pazienti
-      </button>
-
       <div className="nm-page-title">Dashboard studio</div>
       <div className="nm-page-sub">Aderenza al piano nel periodo, per tutto lo studio o per singolo nutrizionista.</div>
 
@@ -90,6 +114,44 @@ export function DashboardView({ team, onBack }: Props) {
             {team?.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             <option value="none">Non assegnato</option>
           </select>
+
+          {trend.length > 1 && (
+            <div className="nm-week-card">
+              <div className="nm-week-card-title">Andamento aderenza globale</div>
+              <div className="nm-page-sub" style={{ marginTop: -4, marginBottom: 4 }}>Media settimanale nel periodo selezionato</div>
+              <div className="nm-week-chart">
+                {trend.map((bucket) => {
+                  const pct = bucketAvg(bucket, scopedIds);
+                  return (
+                    <div key={bucket.from} className="nm-week-day">
+                      <div className="nm-week-bar-track">
+                        <div className="nm-week-bar-fill" style={{ height: `${Math.max(4, pct)}%`, background: 'var(--teal-700)' }} />
+                      </div>
+                      <span className="nm-week-day-label">{formatShortDate(bucket.from)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="nm-section-label">Attività recenti</div>
+          {activity.length === 0 ? (
+            <div className="nm-empty-state">Nessuna attività recente.</div>
+          ) : (
+            <div className="nm-activity-list" style={{ marginBottom: 16 }}>
+              {activity.map((a: DashboardActivityItem) => (
+                <div key={a.id} className="nm-activity-row">
+                  <div className="nm-activity-icon">{activityIcon(a.type)}</div>
+                  <div className="nm-activity-body">
+                    <div className="nm-activity-name">{a.patientName}</div>
+                    <div className="nm-activity-message">{a.message}</div>
+                    <div className="nm-activity-time">{formatRelativeTime(a.createdAt)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {patients.length === 0 ? (
             <div className="nm-empty-state">Nessun paziente ancora.</div>

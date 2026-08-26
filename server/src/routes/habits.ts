@@ -19,10 +19,19 @@ export function weekdayCodeOf(date: string): Weekday {
   return WEEKDAYS.find((w) => WEEKDAY_INDEX[w] === jsDay)!;
 }
 
-interface HabitRow { id: number; text: string; time: string; days: string }
+function shiftDate(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export const HABIT_CATEGORIES = ['mattina', 'pomeriggio', 'sera'] as const;
+export type HabitCategory = (typeof HABIT_CATEGORIES)[number];
+
+interface HabitRow { id: number; text: string; time: string; days: string; category: string | null }
 
 export async function loadHabits(patientId: number) {
-  const { rows } = await db.execute({ sql: 'SELECT id, text, time, days FROM habits WHERE patient_id = ? ORDER BY idx', args: [patientId] });
+  const { rows } = await db.execute({ sql: 'SELECT id, text, time, days, category FROM habits WHERE patient_id = ? ORDER BY idx', args: [patientId] });
   const habits = rows as unknown as HabitRow[];
   const date = todayStr();
   const todayCode = weekdayCodeOf(date);
@@ -43,6 +52,7 @@ export async function loadHabits(patientId: number) {
       id: h.id,
       text: h.text,
       time: h.time,
+      category: (h.category as HabitCategory | null) ?? null,
       days,
       dueToday: days.length === 0 || days.includes(todayCode),
       doneToday: doneToday.has(h.id),
@@ -58,7 +68,51 @@ habitsRouter.get('/habits/week', async (req, res) => {
   res.json(await computeHabitsWeek(req.patientId!, todayStr()));
 });
 
-interface HabitItemBody { id?: unknown; text?: unknown; days?: unknown; time?: unknown }
+export interface HabitDayItem { id: number; text: string; time: string; category: HabitCategory | null; due: boolean; done: boolean }
+
+// Vista di sola lettura delle abitudini dovute/fatte in un giorno passato
+// (per la striscia calendario di Abitudini) — stesso schema di
+// join con habit_checks già usato in loadHabits, solo per una data
+// arbitraria invece che sempre "oggi".
+export async function loadHabitsForDate(patientId: number, date: string): Promise<HabitDayItem[]> {
+  const { rows } = await db.execute({ sql: 'SELECT id, text, time, days, category FROM habits WHERE patient_id = ? ORDER BY idx', args: [patientId] });
+  const habits = rows as unknown as HabitRow[];
+  const code = weekdayCodeOf(date);
+  const ids = habits.map((h) => h.id);
+  const done = new Set<number>();
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    const { rows: checkRows } = await db.execute({
+      sql: `SELECT habit_id FROM habit_checks WHERE done = 1 AND date = ? AND habit_id IN (${placeholders})`,
+      args: [date, ...ids],
+    });
+    for (const r of checkRows as unknown as Array<{ habit_id: number }>) done.add(r.habit_id);
+  }
+
+  return habits.map((h) => {
+    const days = h.days ? (h.days.split(',') as Weekday[]) : [];
+    return {
+      id: h.id,
+      text: h.text,
+      time: h.time,
+      category: (h.category as HabitCategory | null) ?? null,
+      due: days.length === 0 || days.includes(code),
+      done: done.has(h.id),
+    };
+  });
+}
+
+// Stessa finestra mobile di 7 giorni del grafico settimanale — niente
+// storia illimitata finché non serve davvero (YAGNI).
+habitsRouter.get('/habits/day', async (req, res) => {
+  const date = String(req.query.date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'data non valida' });
+  const today = todayStr();
+  if (date < shiftDate(today, -6) || date > today) return res.status(400).json({ error: 'data fuori intervallo' });
+  res.json(await loadHabitsForDate(req.patientId!, date));
+});
+
+interface HabitItemBody { id?: unknown; text?: unknown; days?: unknown; time?: unknown; category?: unknown }
 
 // Salvataggio in blocco come /plan e /supplements/custom, ma preservando
 // l'id: gli item con id vengono aggiornati sul posto, quelli senza sono
@@ -71,6 +125,7 @@ export async function saveHabitsList(patientId: number, input: HabitItemBody[]) 
       text: String(it?.text ?? '').trim(),
       days: Array.isArray(it?.days) ? it.days.filter((d): d is Weekday => (WEEKDAYS as readonly string[]).includes(String(d))) : [],
       time: /^\d{2}:\d{2}$/.test(String(it?.time)) ? String(it.time) : '',
+      category: (HABIT_CATEGORIES as readonly string[]).includes(String(it?.category)) ? (it!.category as HabitCategory) : null,
     }))
     .filter((it) => it.text);
 
@@ -79,14 +134,14 @@ export async function saveHabitsList(patientId: number, input: HabitItemBody[]) 
     const daysCsv = it.days.join(',');
     if (it.id !== undefined) {
       await db.execute({
-        sql: 'UPDATE habits SET idx = ?, text = ?, time = ?, days = ? WHERE id = ? AND patient_id = ?',
-        args: [idx, it.text, it.time, daysCsv, it.id, patientId],
+        sql: 'UPDATE habits SET idx = ?, text = ?, time = ?, days = ?, category = ? WHERE id = ? AND patient_id = ?',
+        args: [idx, it.text, it.time, daysCsv, it.category, it.id, patientId],
       });
       keepIds.push(it.id);
     } else {
       const r = await db.execute({
-        sql: 'INSERT INTO habits (patient_id, idx, text, time, days) VALUES (?, ?, ?, ?, ?)',
-        args: [patientId, idx, it.text, it.time, daysCsv],
+        sql: 'INSERT INTO habits (patient_id, idx, text, time, days, category) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [patientId, idx, it.text, it.time, daysCsv, it.category],
       });
       keepIds.push(Number(r.lastInsertRowid));
     }

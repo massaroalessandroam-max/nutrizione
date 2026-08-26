@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { NutritionistTeamMember } from '../../types';
-import { BackArrowIcon } from '../../icons';
 import { ShareActions } from '../ShareActions';
 
 interface Props {
-  onBack: () => void;
   onGenerateInvite: () => Promise<string>;
 }
 
-export function TeamView({ onBack, onGenerateInvite }: Props) {
+export function TeamView({ onGenerateInvite }: Props) {
   const [team, setTeam] = useState<NutritionistTeamMember[] | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [reset, setReset] = useState<{ name: string; password: string } | null>(null);
@@ -25,10 +23,6 @@ export function TeamView({ onBack, onGenerateInvite }: Props) {
 
   return (
     <div>
-      <button className="nm-back-btn" onClick={onBack}>
-        <BackArrowIcon />Pazienti
-      </button>
-
       <div className="nm-page-title">Nutrizionisti dello studio</div>
       <div className="nm-page-sub">Tutti vedono tutti i pazienti.</div>
 

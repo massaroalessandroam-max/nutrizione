@@ -139,6 +139,10 @@ export interface LogResponse {
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
+// Momento della giornata scelto esplicitamente in "Configura Abitudine".
+// null = non impostata, si deriva dall'orario (vedi habitMeta.ts).
+export type DayPeriod = 'mattina' | 'pomeriggio' | 'sera';
+
 export interface Habit {
   id: number;
   text: string;
@@ -146,10 +150,22 @@ export interface Habit {
   days: Weekday[];
   // Orario abituale, facoltativo (es. "08:00") — stringa vuota se non impostato.
   time: string;
+  category: DayPeriod | null;
   // Oggi è uno dei giorni scelti (o days è vuoto = tutti i giorni).
   dueToday: boolean;
   // Spuntata oggi.
   doneToday: boolean;
+}
+
+// Vista di sola lettura delle abitudini dovute/fatte in un giorno passato
+// (striscia calendario di Abitudini) — niente check/uncheck, solo lettura.
+export interface HabitDayItem {
+  id: number;
+  text: string;
+  time: string;
+  category: DayPeriod | null;
+  due: boolean;
+  done: boolean;
 }
 
 export interface HabitWeekDay {
@@ -221,10 +237,27 @@ export interface StudioDashboardPatient {
   messagesFromPatient: number;
 }
 
+export interface DashboardTrendBucket {
+  from: string;
+  to: string;
+  patients: Array<{ id: number; adherencePct: number }>;
+}
+
+export interface DashboardActivityItem {
+  id: number;
+  patientId: number;
+  patientName: string;
+  type: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface StudioDashboard {
   from: string;
   to: string;
   patients: StudioDashboardPatient[];
+  trend: DashboardTrendBucket[];
+  recentActivity: DashboardActivityItem[];
 }
 
 export type MessageSender = 'paziente' | 'nutrizionista';

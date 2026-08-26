@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 process.env.DB_PATH = ':memory:';
 
 const { db, initDb } = await import('./db.js');
-const { loadHabits, saveHabitsList } = await import('./routes/habits.js');
+const { loadHabits, saveHabitsList, loadHabitsForDate } = await import('./routes/habits.js');
 
 await initDb();
 
@@ -78,4 +78,36 @@ test('loadHabits: scoped per patient, one patient does not see another\'s habits
   const habitsOfPatient1 = await loadHabits(PATIENT);
   assert.equal(habitsOfPatient1.length, 1);
   assert.equal(habitsOfPatient1[0].text, 'Del paziente 1');
+});
+
+test('saveHabitsList: persiste la categoria esplicita, ignora valori non validi', async () => {
+  await db.execute('DELETE FROM habits');
+  await db.execute('DELETE FROM habit_checks');
+
+  const [sera, senzaCategoria] = await saveHabitsList(PATIENT, [
+    { text: 'Camomilla', days: [], category: 'sera' },
+    { text: 'Boh', days: [], category: 'notte' },
+  ]);
+
+  assert.equal(sera.category, 'sera');
+  assert.equal(senzaCategoria.category, null, 'una categoria non tra le 3 valide viene ignorata (null)');
+
+  const [reloaded] = await loadHabits(PATIENT);
+  assert.equal(reloaded.category, 'sera', 'la categoria sopravvive a un ricaricamento');
+});
+
+test('loadHabitsForDate: riflette due/done per una data passata, non per oggi', async () => {
+  await db.execute('DELETE FROM habits');
+  await db.execute('DELETE FROM habit_checks');
+
+  const [h] = await saveHabitsList(PATIENT, [{ text: 'Solo lunedì', days: ['mon'] }]);
+  // Trova un lunedì recente qualsiasi, indipendente dalla data di oggi.
+  const cursor = new Date();
+  while (cursor.getUTCDay() !== 1) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  const monday = cursor.toISOString().slice(0, 10);
+  await db.execute({ sql: 'INSERT INTO habit_checks (habit_id, date, done) VALUES (?, ?, 1)', args: [h.id, monday] });
+
+  const [dayItem] = await loadHabitsForDate(PATIENT, monday);
+  assert.equal(dayItem.due, true);
+  assert.equal(dayItem.done, true);
 });

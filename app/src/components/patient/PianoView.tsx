@@ -4,11 +4,11 @@ import {
   api, PLAN_CATEGORIES, planUploadDownloadUrl,
   type PlanItem, type PlanNotes, type PlanUpload, type ChefCombo,
 } from '../../api';
-import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon } from '../../icons';
+import { CameraIcon, PdfIcon, PlusIcon, PencilIcon, TrashIcon, ChevronIcon, MealIcon, RefreshIcon, CheckCircleIcon, MinusCircleIcon } from '../../icons';
 import { generatePlanPdf } from '../../lib/pdf';
 import { fileToBase64 } from '../../lib/file';
 import { MEAL_LABEL } from '../../lib/mealMeta';
-import { MAX_PER_WEEK_LABEL, MAX_PER_WEEK_SELECT_OPTIONS } from '../../lib/planMeta';
+import { MAX_PER_WEEK_LABEL, MAX_PER_WEEK_SELECT_OPTIONS, CATEGORY_LABEL_SHORT } from '../../lib/planMeta';
 import { MEAL_ORDER, type MealKey } from '../../types';
 
 const OTHER_CATEGORY = 'Altro';
@@ -342,6 +342,23 @@ export function PianoView({ patientName }: Props) {
         </div>
       )}
 
+      {notesLoaded && (linesToList(generalRulesText).length > 0 || linesToList(divietiText).length > 0) && (
+        <div className="nm-rules-card">
+          {linesToList(generalRulesText).map((line, i) => (
+            <div key={`rule-${i}`} className="nm-rules-row">
+              <CheckCircleIcon size={15} color="var(--teal-700)" />
+              <span>{line}</span>
+            </div>
+          ))}
+          {linesToList(divietiText).map((line, i) => (
+            <div key={`divieto-${i}`} className="nm-rules-row">
+              <MinusCircleIcon size={15} color="var(--bad-fg-strong)" />
+              <span style={{ color: 'var(--bad-fg-strong)' }}>Allergia: {line}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {notesLoaded && (
         <>
           <div className="nm-section-label" style={{ marginTop: 20 }}>Regole generali</div>
@@ -529,7 +546,7 @@ export function PianoView({ patientName }: Props) {
               <div key={group.name} className="nm-plan-category">
                 {(group.entries.length > 0 || group.name !== OTHER_CATEGORY) && (
                   <button className="nm-plan-category-head" onClick={() => toggleCategory(group.name)}>
-                    <span>{group.name}<span className="nm-plan-category-count"> · {group.entries.length}</span></span>
+                    <span>{CATEGORY_LABEL_SHORT[group.name] ?? group.name}<span className="nm-plan-category-count"> · {group.entries.length}</span></span>
                     <ChevronIcon size={16} open={isOpen} />
                   </button>
                 )}
