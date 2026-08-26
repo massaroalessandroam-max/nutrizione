@@ -21,8 +21,8 @@ const MOOD_OPTIONS: Array<{ value: number; emoji: string; label: string }> = [
 
 const HEAD_GRADIENT: Record<string, string> = {
   good: 'linear-gradient(150deg, var(--teal-700), var(--teal-900))',
-  ok: 'linear-gradient(150deg, #B67B12, #8a5c0d)',
-  bad: 'linear-gradient(150deg, #C0502A, #8f3a1c)',
+  ok: 'linear-gradient(150deg, var(--gold-deep), var(--gold-text))',
+  bad: 'linear-gradient(150deg, var(--bad-fg-strong), #7A1010)',
   none: 'linear-gradient(150deg, var(--teal-700), var(--teal-900))',
 };
 
