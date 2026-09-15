@@ -18,7 +18,7 @@ export async function loadRecentActivity(limit = 20): Promise<ActivityItem[]> {
   const { rows } = await db.execute({
     sql: `SELECT e.id, e.patient_id, p.name AS patient_name, e.type, e.message, e.created_at
           FROM events e JOIN patients p ON p.id = e.patient_id
-          ORDER BY e.created_at DESC LIMIT ?`,
+          ORDER BY e.created_at DESC, e.id DESC LIMIT ?`,
     args: [limit],
   });
   return (rows as any[]).map((r) => ({

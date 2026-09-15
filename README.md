@@ -38,9 +38,9 @@ The `Diario Nemis.dc.html` design has been implemented as a real app:
 
 Real integrations (per product decision): audio transcription uses the browser's Web Speech API,
 PDF export uses jsPDF (client-side, no external service), and "Invia su WhatsApp" opens a `wa.me`
-deep link with the report pre-filled. Photo food-recognition remains mocked (no vision API key
-configured) — swap in a real vision model in `app/src/components/sheet/LogSheet.tsx` when one is
-available.
+deep link with the report pre-filled. Photo food-recognition uses Claude vision
+(`server/src/routes/mealPhoto.ts` + `server/src/anthropic.ts`) — requires `ANTHROPIC_API_KEY` set
+on the server.
 
 Streak, the weekly chart and the badges (Premi tab) are computed server-side from the real meal
 history in `server/src/stats.ts` — not hardcoded demo numbers.
