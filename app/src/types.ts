@@ -260,6 +260,17 @@ export interface StudioDashboard {
   recentActivity: DashboardActivityItem[];
 }
 
+export interface Exercise {
+  exerciseId: string;
+  name: string;
+  gifUrl: string;
+  bodyParts: string[];
+  equipments: string[];
+  targetMuscles: string[];
+  secondaryMuscles: string[];
+  instructions: string[];
+}
+
 export type MessageSender = 'paziente' | 'nutrizionista';
 
 export interface Message {

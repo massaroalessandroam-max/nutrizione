@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword, hashToken, newSessionToken, requireNutrit
 
 export const nutritionistAuthRouter = Router();
 
-async function createNutritionistSession(nutritionistId: number): Promise<string> {
+export async function createNutritionistSession(nutritionistId: number): Promise<string> {
   const token = newSessionToken();
   await db.execute({
     sql: 'INSERT INTO nutritionist_sessions (token_hash, nutritionist_id, created_at) VALUES (?, ?, ?)',

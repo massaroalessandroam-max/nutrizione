@@ -6,6 +6,7 @@ const NAV_ITEMS: Array<{ key: Tab; label: string }> = [
   { key: 'abitudini', label: 'Abitudini' },
   { key: 'premi', label: 'Andamento' },
   { key: 'piano', label: 'Piano' },
+  { key: 'esercizi', label: 'Esercizi' },
   { key: 'report', label: 'Report' },
   { key: 'messaggi', label: 'Messaggi' },
 ];

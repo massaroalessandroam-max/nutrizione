@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, authStorage } from '../api';
 
-type Screen = 'choose' | 'patient' | 'nutri-login' | 'nutri-register';
+type Screen = 'choose' | 'codes' | 'patient' | 'nutri-login' | 'nutri-register';
 
 interface Props {
   onPatientAuthenticated: () => void;
@@ -18,6 +18,38 @@ export function AuthGate({ onPatientAuthenticated, onNutritionistAuthenticated }
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [inviteToken, setInviteToken] = useState('');
+
+  // null = non ancora saputo: evita di mostrare per un attimo la schermata
+  // a codice prima di scoprire che il server ha l'accesso libero attivo.
+  const [openAccess, setOpenAccess] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.getOpenAccess().then((r) => setOpenAccess(r.openAccess)).catch(() => setOpenAccess(false));
+  }, []);
+
+  // Un solo token salvato alla volta: Root dà la precedenza al nutrizionista,
+  // quindi entrando come paziente va tolto il suo token (e viceversa), altrimenti
+  // al reload si tornerebbe alla vista sbagliata.
+  const enterOpen = async (as: 'patient' | 'nutritionist') => {
+    setError('');
+    setBusy(true);
+    try {
+      if (as === 'patient') {
+        const { token } = await api.openPatientLogin();
+        authStorage.clearNutritionistToken();
+        authStorage.setPatientToken(token);
+        onPatientAuthenticated();
+      } else {
+        const { token } = await api.openNutritionistLogin();
+        authStorage.clearPatientToken();
+        authStorage.setNutritionistToken(token);
+        onNutritionistAuthenticated();
+      }
+    } catch (e) {
+      setError((e as Error).message || 'Accesso non riuscito');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const patientLogin = async () => {
     setError('');
@@ -61,7 +93,30 @@ export function AuthGate({ onPatientAuthenticated, onNutritionistAuthenticated }
     }
   };
 
-  if (screen === 'choose') {
+  if (openAccess === null) {
+    return <div className="nm-section"><div className="nm-empty-state">Caricamento…</div></div>;
+  }
+
+  if (screen === 'choose' && openAccess) {
+    return (
+      <div className="nm-section">
+        <div className="nm-page-title">Diario Nemis</div>
+        <div className="nm-page-sub">Versione di prova: scegli come entrare, senza codice.</div>
+        <button className="nm-submit-btn" style={{ marginTop: 20 }} disabled={busy} onClick={() => enterOpen('patient')}>
+          Entra come paziente
+        </button>
+        <button className="nm-onboard-add-btn" style={{ marginTop: 12 }} disabled={busy} onClick={() => enterOpen('nutritionist')}>
+          Entra come nutrizionista
+        </button>
+        {error && <div className="nm-plan-error">{error}</div>}
+        <button className="nm-modal-btn nm-modal-btn-secondary" style={{ marginTop: 20 }} onClick={() => { setError(''); setScreen('codes'); }}>
+          Ho un codice o un account
+        </button>
+      </div>
+    );
+  }
+
+  if (screen === 'choose' || screen === 'codes') {
     return (
       <div className="nm-section">
         <div className="nm-page-title">Diario Nemis</div>

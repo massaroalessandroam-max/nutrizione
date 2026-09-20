@@ -1,6 +1,6 @@
 import type {
   AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember, StudioDashboard,
-  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, HabitDayItem, DayPeriod, Weekday, Appointment, Goal, GoalLevel,
+  MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, HabitDayItem, DayPeriod, Weekday, Appointment, Goal, GoalLevel, Exercise,
 } from './types';
 
 const PATIENT_TOKEN_KEY = 'nm_patient_token';
@@ -45,6 +45,9 @@ const nutriReq = <T>(path: string, init?: RequestInit) => req<T>(path, init, 'nu
 
 export const api = {
   // ===== Autenticazione =====
+  getOpenAccess: () => req<{ openAccess: boolean }>('/health', {}, 'none'),
+  openPatientLogin: () => req<{ token: string }>('/open/patient', { method: 'POST' }, 'none'),
+  openNutritionistLogin: () => req<{ token: string }>('/open/nutritionist', { method: 'POST' }, 'none'),
   patientLogin: (code: string) => req<{ token: string; patientId: number }>('/patient-auth/login', { method: 'POST', body: JSON.stringify({ code }) }, 'none'),
   nutritionistLogin: (email: string, password: string) =>
     req<{ token: string }>('/nutritionist-auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, 'none'),
@@ -112,6 +115,14 @@ export const api = {
     req<Habit[]>(`/habits/${id}/check`, { method: 'PUT', body: JSON.stringify({ done }) }),
   getMessages: () => req<Message[]>('/messages'),
   sendMessage: (text: string) => req<Message[]>('/messages', { method: 'POST', body: JSON.stringify({ text }) }),
+  getExercises: (params: { q?: string; bodyPart?: string; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.bodyPart) qs.set('bodyPart', params.bodyPart);
+    if (params.offset) qs.set('offset', String(params.offset));
+    return req<{ total: number; items: Exercise[]; catalogReady: boolean }>(`/exercises?${qs}`);
+  },
+  getExerciseBodyParts: () => req<string[]>('/exercises/bodyparts'),
 
   // ===== Dashboard nutrizionista =====
   getNutritionistPatients: () => nutriReq<NutritionistPatientListItem[]>('/nutritionist/patients'),

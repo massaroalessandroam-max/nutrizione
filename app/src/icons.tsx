@@ -45,6 +45,7 @@ const NAV_PATHS: Record<string, string> = {
   abitudini: 'M4 6l2 2 4-4M12 7h8M4 14l2 2 4-4M12 15h8',
   premi: 'M3 17l6-6 4 4 8-8M15 7h6v6',
   piano: 'M14 2v5h5M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7zM9 13h6M9 17h4',
+  esercizi: 'M6.5 6.5v11M17.5 6.5v11M2 9.5v5M22 9.5v5M6.5 12h11',
   report: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
   messaggi: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
 };

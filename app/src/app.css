@@ -439,6 +439,17 @@
 .nm-chip.is-on { background: var(--teal-700); color: #fff; border-color: var(--teal-700); }
 .nm-chip.is-off { background: var(--card); color: var(--ink); border-color: var(--line-medium); }
 
+.nm-exercise-list { display: flex; flex-direction: column; gap: 10px; }
+.nm-exercise-card { background: var(--card); border: 1px solid var(--line-medium); border-radius: 14px; overflow: hidden; }
+.nm-exercise-card-head {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px;
+  background: none; border: none; cursor: pointer; text-align: left;
+}
+.nm-exercise-gif { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--neutral-chip); flex-shrink: 0; }
+.nm-exercise-card-main { flex: 1; min-width: 0; }
+.nm-exercise-name { font-weight: 700; color: var(--ink); text-transform: capitalize; }
+.nm-exercise-instructions { margin: 0; padding: 0 16px 14px 32px; font-size: 13px; color: var(--ink-faint); display: flex; flex-direction: column; gap: 4px; }
+
 .nm-mode-tabs { display: flex; background: var(--neutral-chip); border-radius: 13px; padding: 4px; margin-bottom: 16px; }
 .nm-mode-tab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;

@@ -6,6 +6,7 @@ import { DiarioView } from './components/patient/DiarioView';
 import { AbitudiniView } from './components/patient/AbitudiniView';
 import { PremiView } from './components/patient/PremiView';
 import { PianoView } from './components/patient/PianoView';
+import { EserciziView } from './components/patient/EserciziView';
 import { ReportView } from './components/patient/ReportView';
 import { MessaggiView } from './components/patient/MessaggiView';
 import { LogSheet } from './components/sheet/LogSheet';
@@ -53,6 +54,7 @@ function App({ onLogout }: Props) {
               {d.tab === 'abitudini' && <AbitudiniView />}
               {d.tab === 'premi' && <PremiView state={d.appState} onDayClick={d.openBackfill} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
+              {d.tab === 'esercizi' && <EserciziView />}
               {d.tab === 'report' && <ReportView state={d.appState} onSetFreq={d.setFreq} />}
               {d.tab === 'messaggi' && <MessaggiView onMessagesOpened={d.refreshState} />}
             </>

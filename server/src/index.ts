@@ -12,6 +12,8 @@ import { supplementsRouter } from './routes/supplements.js';
 import { chefRouter } from './routes/chef.js';
 import { habitsRouter } from './routes/habits.js';
 import { messagesRouter } from './routes/messages.js';
+import { exercisesRouter } from './routes/exercises.js';
+import { openAccessRouter, OPEN_ACCESS } from './routes/openAccess.js';
 import { patientAuthRouter } from './routes/patientAuth.js';
 import { nutritionistAuthRouter } from './routes/nutritionistAuth.js';
 import { nutritionistRouter } from './routes/nutritionist.js';
@@ -26,11 +28,12 @@ const PORT = Number(process.env.PORT ?? 4001);
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb() }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, remoteDb: isRemoteDb(), openAccess: OPEN_ACCESS }));
 
 // Login (nessuna autenticazione richiesta per accedervi).
 app.use('/api', patientAuthRouter);
 app.use('/api', nutritionistAuthRouter);
+app.use('/api', openAccessRouter);
 
 // Dashboard nutrizionista — prefisso dedicato e montata PRIMA dei router
 // paziente qui sotto: tutti loro applicano requirePatient in blocco con
@@ -50,6 +53,7 @@ app.use('/api', supplementsRouter);
 app.use('/api', chefRouter);
 app.use('/api', habitsRouter);
 app.use('/api', messagesRouter);
+app.use('/api', exercisesRouter);
 
 // Serve il frontend compilato (app/dist), così un solo servizio ospita sia
 // il sito che le API — niente CORS/proxy da configurare in produzione.
@@ -67,6 +71,20 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'server_error', detail: err.message });
 });
 
+// Il piano free di Render mette in standby il servizio dopo ~15 minuti di
+// inattività: un self-ping periodico all'health endpoint lo tiene sveglio.
+// RENDER_EXTERNAL_URL è impostata automaticamente da Render, quindi in
+// locale questo blocco non fa nulla.
+function startKeepAlive() {
+  const externalUrl = process.env.RENDER_EXTERNAL_URL;
+  if (!externalUrl) return;
+  setInterval(() => {
+    fetch(`${externalUrl}/api/health`).catch((e) => {
+      console.error('[keep-alive] ping fallito:', (e as Error).message);
+    });
+  }, 10 * 60_000).unref();
+}
+
 // Lo schema va pronto prima di accettare richieste: con un database remoto
 // l'inizializzazione è una chiamata di rete.
 initDb()
@@ -78,6 +96,7 @@ initDb()
           ? 'Database remoto (persistente tra i deploy) collegato.'
           : 'Database su file locale: i dati NON sopravvivono a un nuovo deploy. Imposta DATABASE_URL per la persistenza.'
       );
+      startKeepAlive();
     });
   })
   .catch((e) => {
