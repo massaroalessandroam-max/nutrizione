@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 process.env.DB_PATH = ':memory:';
 
 const { initDb } = await import('./db.js');
-const { createPlan, saveWorkout, loadPlans, loadProgress, deletePlan } = await import('./routes/workouts.js');
+const { createPlan, saveWorkout, loadPlans, loadProgress, deletePlan, updatePlan } = await import('./routes/workouts.js');
 
 await initDb();
 
@@ -54,4 +54,22 @@ test('validazione e cancellazione scheda', async () => {
   await deletePlan(2, plan.id);
   assert.equal((await loadPlans(PATIENT)).length, 2, 'un altro paziente non cancella schede altrui');
   assert.equal((await deletePlan(PATIENT, plan.id)).length, 1);
+});
+
+test('modifica scheda: sostituisce esercizi e dati, stessa scheda e stesso autore; non quella di altri', async () => {
+  const [plan] = await loadPlans(PATIENT);
+  const edited = await updatePlan(PATIENT, plan.id, {
+    name: 'Nuovo nome', startDate: '2026-09-01', endDate: '2026-12-31',
+    exercises: [{ ...run, minutes: 30 }, { ...bench, sets: 5, reps: 5, weight: 60 }],
+  });
+  assert.ok(typeof edited !== 'string');
+  const after = edited.find((p) => p.id === plan.id)!;
+  assert.equal(after.name, 'Nuovo nome');
+  assert.equal(after.endDate, '2026-12-31');
+  assert.equal(after.createdBy, plan.createdBy);
+  assert.deepEqual(after.exercises.map((e) => [e.exerciseId, e.weight, e.minutes]), [['run', 0, 30], ['bench', 60, 0]]);
+  assert.equal(after.exercises[1].last?.sets[0].weight, 40, 'il carico proposto viene ancora dallo storico (sessione più recente)');
+
+  assert.equal(await updatePlan(2, plan.id, { name: 'x', startDate: '2026-09-01', exercises: [bench] }), 'scheda non trovata');
+  assert.equal(await updatePlan(PATIENT, plan.id, { name: '', startDate: '2026-09-01', exercises: [bench] }), 'nome obbligatorio');
 });

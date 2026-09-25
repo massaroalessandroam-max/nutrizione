@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
-import type { PatientTraining, PlanDraft } from '../../types';
+import type { PatientTraining, PlanDraft, WorkoutPlan } from '../../types';
 import { nutritionistCatalog } from '../../lib/workoutMeta';
 import { SchedaBuilder } from '../patient/SchedaBuilder';
 import { ProgressCard } from '../patient/ProgressiView';
@@ -9,7 +9,8 @@ import { PlanCard, WorkoutHistory } from '../patient/WorkoutParts';
 // Il nutrizionista crea e toglie schede; gli allenamenti li registra solo il paziente.
 export function PatientTrainingTab({ patientId }: { patientId: number }) {
   const [data, setData] = useState<PatientTraining | null>(null);
-  const [creating, setCreating] = useState(false);
+  // undefined = elenco; null = nuova scheda; scheda = modifica di quella scheda
+  const [editing, setEditing] = useState<WorkoutPlan | null | undefined>(undefined);
 
   useEffect(() => {
     setData(null);
@@ -18,19 +19,20 @@ export function PatientTrainingTab({ patientId }: { patientId: number }) {
 
   if (!data) return <div className="nm-empty-state">Caricamento…</div>;
 
-  if (creating) {
+  if (editing !== undefined) {
     return (
-      <>
-        <SchedaBuilder
-          catalog={nutritionistCatalog}
-          onSave={async (draft: PlanDraft) => {
-            const plans = await api.createPatientWorkoutPlan(patientId, draft);
-            setData({ ...data, plans });
-            setCreating(false);
-          }}
-        />
-        <button className="nm-modal-btn nm-modal-btn-secondary" style={{ width: '100%' }} onClick={() => setCreating(false)}>Annulla</button>
-      </>
+      <SchedaBuilder
+        catalog={nutritionistCatalog}
+        initial={editing ?? undefined}
+        onCancel={() => setEditing(undefined)}
+        onSave={async (draft: PlanDraft) => {
+          const plans = editing
+            ? await api.updatePatientWorkoutPlan(patientId, editing.id, draft)
+            : await api.createPatientWorkoutPlan(patientId, draft);
+          setData({ ...data, plans });
+          setEditing(undefined);
+        }}
+      />
     );
   }
 
@@ -42,13 +44,14 @@ export function PatientTrainingTab({ patientId }: { patientId: number }) {
 
   return (
     <div style={{ marginTop: 14 }}>
-      <button className="nm-modal-btn nm-modal-btn-primary" style={{ width: '100%' }} onClick={() => setCreating(true)}>Nuova scheda per il paziente</button>
+      <button className="nm-modal-btn nm-modal-btn-primary" style={{ width: '100%' }} onClick={() => setEditing(null)}>Nuova scheda per il paziente</button>
 
       <div className="nm-section-label" style={{ marginTop: 16 }}>Schede</div>
       {data.plans.length === 0 && <div className="nm-empty-state">Nessuna scheda.</div>}
       <div className="nm-exercise-list">
         {data.plans.map((p) => (
           <PlanCard key={p.id} plan={p}>
+            <button className="nm-modal-btn nm-modal-btn-secondary" onClick={() => setEditing(p)}>Modifica</button>
             <button className="nm-modal-btn nm-modal-btn-secondary" onClick={() => remove(p.id, p.name)}>Elimina</button>
           </PlanCard>
         ))}

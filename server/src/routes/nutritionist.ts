@@ -10,7 +10,7 @@ import { addAppointment, deleteAppointment } from './appointments.js';
 import { GOAL_LEVELS, addGoal, deleteGoal, type GoalLevel } from './goals.js';
 import { addEvent, loadRecentActivity } from '../events.js';
 import { listBodyParts, listExercises } from './exercises.js';
-import { createPlan, deletePlan, loadPlans, loadProgress, loadWorkouts } from './workouts.js';
+import { createPlan, deletePlan, loadPlans, loadProgress, loadWorkouts, updatePlan } from './workouts.js';
 
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
@@ -184,6 +184,12 @@ nutritionistRouter.get('/patients/:id/training', async (req, res) => {
 nutritionistRouter.post('/patients/:id/workout-plans', async (req, res) => {
   const result = await createPlan(Number(req.params.id), 'nutritionist', req.body);
   if (typeof result === 'string') return res.status(400).json({ error: result });
+  res.json(result);
+});
+
+nutritionistRouter.put('/patients/:id/workout-plans/:planId', async (req, res) => {
+  const result = await updatePlan(Number(req.params.id), Number(req.params.planId), req.body);
+  if (typeof result === 'string') return res.status(result === 'scheda non trovata' ? 404 : 400).json({ error: result });
   res.json(result);
 });
 

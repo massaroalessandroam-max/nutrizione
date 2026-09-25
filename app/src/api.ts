@@ -126,6 +126,7 @@ export const api = {
   getExerciseBodyParts: () => req<string[]>('/exercises/bodyparts'),
   getWorkoutPlans: () => req<WorkoutPlan[]>('/workout-plans'),
   createWorkoutPlan: (draft: PlanDraft) => req<WorkoutPlan[]>('/workout-plans', { method: 'POST', body: JSON.stringify(draft) }),
+  updateWorkoutPlan: (id: number, draft: PlanDraft) => req<WorkoutPlan[]>(`/workout-plans/${id}`, { method: 'PUT', body: JSON.stringify(draft) }),
   deleteWorkoutPlan: (id: number) => req<WorkoutPlan[]>(`/workout-plans/${id}`, { method: 'DELETE' }),
   getWorkouts: () => req<Workout[]>('/workouts'),
   logWorkout: (draft: WorkoutDraft) => req<Workout[]>('/workouts', { method: 'POST', body: JSON.stringify(draft) }),
@@ -152,6 +153,8 @@ export const api = {
   getPatientTraining: (id: number) => nutriReq<PatientTraining>(`/nutritionist/patients/${id}/training`),
   createPatientWorkoutPlan: (id: number, draft: PlanDraft) =>
     nutriReq<WorkoutPlan[]>(`/nutritionist/patients/${id}/workout-plans`, { method: 'POST', body: JSON.stringify(draft) }),
+  updatePatientWorkoutPlan: (id: number, planId: number, draft: PlanDraft) =>
+    nutriReq<WorkoutPlan[]>(`/nutritionist/patients/${id}/workout-plans/${planId}`, { method: 'PUT', body: JSON.stringify(draft) }),
   deletePatientWorkoutPlan: (id: number, planId: number) =>
     nutriReq<WorkoutPlan[]>(`/nutritionist/patients/${id}/workout-plans/${planId}`, { method: 'DELETE' }),
   deletePatientGoal: (id: number, goalId: number) =>

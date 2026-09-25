@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Exercise, PlanDraft, PlanDraftExercise } from '../../types';
+import type { Exercise, PlanDraft, PlanDraftExercise, WorkoutPlan } from '../../types';
 import { TrashIcon } from '../../icons';
 import { kindOf, todayIso } from '../../lib/workoutMeta';
 import { ExercisePicker, type Catalog } from './ExercisePicker';
@@ -15,11 +15,19 @@ function NumField({ label, value, onChange, step = 1 }: { label: string; value: 
   );
 }
 
-export function SchedaBuilder({ catalog, onSave }: { catalog: Catalog; onSave: (draft: PlanDraft) => Promise<void> }) {
-  const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState(todayIso());
-  const [endDate, setEndDate] = useState('');
-  const [exercises, setExercises] = useState<PlanDraftExercise[]>([]);
+// Senza `initial` crea una scheda nuova; con `initial` la modifica (stesso modulo, precompilato).
+export function SchedaBuilder({ catalog, onSave, initial, onCancel }: {
+  catalog: Catalog;
+  onSave: (draft: PlanDraft) => Promise<void>;
+  initial?: WorkoutPlan;
+  onCancel?: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [startDate, setStartDate] = useState(initial?.startDate ?? todayIso());
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '');
+  const [exercises, setExercises] = useState<PlanDraftExercise[]>(
+    () => initial?.exercises.map(({ exerciseId, name, gifUrl, kind, sets, reps, weight, minutes }) => ({ exerciseId, name, gifUrl, kind, sets, reps, weight, minutes })) ?? []
+  );
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -41,8 +49,10 @@ export function SchedaBuilder({ catalog, onSave }: { catalog: Catalog; onSave: (
 
   return (
     <div className="nm-section">
-      <div className="nm-page-title">Crea scheda</div>
-      <div className="nm-page-sub">Dai un nome alla scheda, scegli gli esercizi e imposta i valori di partenza.</div>
+      <div className="nm-page-title">{initial ? 'Modifica scheda' : 'Crea scheda'}</div>
+      <div className="nm-page-sub">
+        {initial ? 'Cambia nome, date, esercizi o valori. Gli allenamenti già registrati restano com\'erano.' : 'Dai un nome alla scheda, scegli gli esercizi e imposta i valori di partenza.'}
+      </div>
 
       <input className="nm-text-input" placeholder="Nome scheda (es. Forza A)" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="nm-workout-row" style={{ marginTop: 10 }}>
@@ -82,9 +92,12 @@ export function SchedaBuilder({ catalog, onSave }: { catalog: Catalog; onSave: (
       {picking && <ExercisePicker catalog={catalog} addedIds={exercises.map((e) => e.exerciseId)} onAdd={add} />}
 
       {error && <div className="nm-empty-state" style={{ color: 'var(--bad-fg-strong)' }}>{error}</div>}
-      <button className="nm-modal-btn nm-modal-btn-primary" style={{ width: '100%', marginTop: 16 }} disabled={saving || !name.trim() || exercises.length === 0} onClick={save}>
-        {saving ? 'Salvataggio…' : 'Salva scheda'}
-      </button>
+      <div className="nm-workout-row" style={{ marginTop: 16 }}>
+        {onCancel && <button className="nm-modal-btn nm-modal-btn-secondary" onClick={onCancel}>Annulla</button>}
+        <button className="nm-modal-btn nm-modal-btn-primary" disabled={saving || !name.trim() || exercises.length === 0} onClick={save}>
+          {saving ? 'Salvataggio…' : initial ? 'Salva modifiche' : 'Salva scheda'}
+        </button>
+      </div>
     </div>
   );
 }

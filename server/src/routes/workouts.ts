@@ -109,7 +109,10 @@ export async function loadPlans(patientId: number): Promise<WorkoutPlan[]> {
   }));
 }
 
-export async function createPlan(patientId: number, createdBy: 'patient' | 'nutritionist', body: any): Promise<WorkoutPlan[] | string> {
+interface PlanInput { name: string; startDate: string; endDate: string; exercises: Array<ExerciseRef & { sets: number; reps: number; weight: number; minutes: number }> }
+
+// Validazione condivisa da creazione e modifica: stringa = messaggio d'errore.
+function parsePlan(body: any): PlanInput | string {
   const name = str(body?.name, 80);
   if (!name) return 'nome obbligatorio';
   const startDate = str(body?.startDate, 10);
@@ -123,12 +126,10 @@ export async function createPlan(patientId: number, createdBy: 'patient' | 'nutr
     })
     .filter(Boolean);
   if (!exercises.length) return 'aggiungi almeno un esercizio';
+  return { name, startDate, endDate, exercises };
+}
 
-  const result = await db.execute({
-    sql: 'INSERT INTO workout_plans (patient_id, name, start_date, end_date, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    args: [patientId, name, startDate, endDate, createdBy, new Date().toISOString()],
-  });
-  const planId = Number(result.lastInsertRowid);
+async function insertPlanExercises(planId: number, exercises: PlanInput['exercises']): Promise<void> {
   for (const [idx, e] of exercises.entries()) {
     await db.execute({
       sql: `INSERT INTO workout_plan_exercises (plan_id, idx, exercise_id, name, gif_url, kind, sets, reps, weight, minutes)
@@ -136,6 +137,33 @@ export async function createPlan(patientId: number, createdBy: 'patient' | 'nutr
       args: [planId, idx, e.exerciseId, e.name, e.gifUrl, e.kind, e.sets, e.reps, e.weight, e.minutes],
     });
   }
+}
+
+export async function createPlan(patientId: number, createdBy: 'patient' | 'nutritionist', body: any): Promise<WorkoutPlan[] | string> {
+  const plan = parsePlan(body);
+  if (typeof plan === 'string') return plan;
+  const result = await db.execute({
+    sql: 'INSERT INTO workout_plans (patient_id, name, start_date, end_date, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [patientId, plan.name, plan.startDate, plan.endDate, createdBy, new Date().toISOString()],
+  });
+  await insertPlanExercises(Number(result.lastInsertRowid), plan.exercises);
+  return loadPlans(patientId);
+}
+
+// Modifica: sostituisce nome, date ed esercizi. Resta la stessa scheda (id e
+// autore invariati) e gli allenamenti già registrati non cambiano: portano
+// con sé nome e serie di quando sono stati fatti.
+export async function updatePlan(patientId: number, planId: number, body: any): Promise<WorkoutPlan[] | string> {
+  const plan = parsePlan(body);
+  if (typeof plan === 'string') return plan;
+  const { rows } = await db.execute({ sql: 'SELECT id FROM workout_plans WHERE id = ? AND patient_id = ?', args: [planId, patientId] });
+  if (!rows.length) return 'scheda non trovata';
+  await db.execute({
+    sql: 'UPDATE workout_plans SET name = ?, start_date = ?, end_date = ? WHERE id = ?',
+    args: [plan.name, plan.startDate, plan.endDate, planId],
+  });
+  await db.execute({ sql: 'DELETE FROM workout_plan_exercises WHERE plan_id = ?', args: [planId] });
+  await insertPlanExercises(planId, plan.exercises);
   return loadPlans(patientId);
 }
 
@@ -237,6 +265,12 @@ workoutsRouter.get('/workout-plans', async (req, res) => res.json(await loadPlan
 workoutsRouter.post('/workout-plans', async (req, res) => {
   const result = await createPlan(req.patientId!, 'patient', req.body);
   if (typeof result === 'string') return res.status(400).json({ error: result });
+  res.json(result);
+});
+
+workoutsRouter.put('/workout-plans/:id', async (req, res) => {
+  const result = await updatePlan(req.patientId!, Number(req.params.id), req.body);
+  if (typeof result === 'string') return res.status(result === 'scheda non trovata' ? 404 : 400).json({ error: result });
   res.json(result);
 });
 
