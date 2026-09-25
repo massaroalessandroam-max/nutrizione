@@ -13,6 +13,8 @@ import { chefRouter } from './routes/chef.js';
 import { habitsRouter } from './routes/habits.js';
 import { messagesRouter } from './routes/messages.js';
 import { exercisesRouter } from './routes/exercises.js';
+import { startBackgroundRefresh as startExerciseCatalog } from './routes/exercises.js';
+import { workoutsRouter } from './routes/workouts.js';
 import { openAccessRouter, OPEN_ACCESS } from './routes/openAccess.js';
 import { patientAuthRouter } from './routes/patientAuth.js';
 import { nutritionistAuthRouter } from './routes/nutritionistAuth.js';
@@ -54,6 +56,7 @@ app.use('/api', chefRouter);
 app.use('/api', habitsRouter);
 app.use('/api', messagesRouter);
 app.use('/api', exercisesRouter);
+app.use('/api', workoutsRouter);
 
 // Serve il frontend compilato (app/dist), così un solo servizio ospita sia
 // il sito che le API — niente CORS/proxy da configurare in produzione.
@@ -97,6 +100,7 @@ initDb()
           : 'Database su file locale: i dati NON sopravvivono a un nuovo deploy. Imposta DATABASE_URL per la persistenza.'
       );
       startKeepAlive();
+      startExerciseCatalog();
     });
   })
   .catch((e) => {

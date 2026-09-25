@@ -4,7 +4,7 @@ import { fileToBase64 } from '../lib/file';
 import type { AppState, DayMealState, FastingPref, LogSummary, MealKey, Schedule } from '../types';
 import { MEAL_ORDER } from '../types';
 
-export type Tab = 'diario' | 'abitudini' | 'premi' | 'piano' | 'esercizi' | 'report' | 'messaggi';
+export type Tab = 'diario' | 'abitudini' | 'premi' | 'piano' | 'schede' | 'crea' | 'progressi' | 'report' | 'messaggi';
 export type LogMode = 'text' | 'audio' | 'photo';
 
 export function useDiario() {

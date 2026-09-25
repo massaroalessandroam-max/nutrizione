@@ -9,6 +9,8 @@ import { loadMessages, addMessage, markMessagesRead } from './messages.js';
 import { addAppointment, deleteAppointment } from './appointments.js';
 import { GOAL_LEVELS, addGoal, deleteGoal, type GoalLevel } from './goals.js';
 import { addEvent, loadRecentActivity } from '../events.js';
+import { listBodyParts, listExercises } from './exercises.js';
+import { createPlan, deletePlan, loadPlans, loadProgress, loadWorkouts } from './workouts.js';
 
 export const nutritionistRouter = Router();
 nutritionistRouter.use(requireNutritionist);
@@ -165,6 +167,28 @@ nutritionistRouter.delete('/patients/:id/goals/:goalId', async (req, res) => {
   const patientId = Number(req.params.id);
   const goalId = Number(req.params.goalId);
   res.json(await deleteGoal(patientId, goalId));
+});
+
+// Allenamento: il nutrizionista crea/elimina schede per il paziente e ne
+// legge allenamenti e progressi (li registra solo il paziente). Le schede
+// sono le stesse del paziente, con createdBy='nutritionist'.
+nutritionistRouter.get('/exercises/bodyparts', listBodyParts);
+nutritionistRouter.get('/exercises', listExercises);
+
+nutritionistRouter.get('/patients/:id/training', async (req, res) => {
+  const patientId = Number(req.params.id);
+  const [plans, workouts, progress] = await Promise.all([loadPlans(patientId), loadWorkouts(patientId), loadProgress(patientId)]);
+  res.json({ plans, workouts, progress });
+});
+
+nutritionistRouter.post('/patients/:id/workout-plans', async (req, res) => {
+  const result = await createPlan(Number(req.params.id), 'nutritionist', req.body);
+  if (typeof result === 'string') return res.status(400).json({ error: result });
+  res.json(result);
+});
+
+nutritionistRouter.delete('/patients/:id/workout-plans/:planId', async (req, res) => {
+  res.json(await deletePlan(Number(req.params.id), Number(req.params.planId)));
 });
 
 // Stesso piano del paziente (nutrition_plan_items): entrambi possono

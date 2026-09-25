@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { requirePatient } from '../auth.js';
 
 const EDB_BASE = 'https://oss.exercisedb.dev/api/v1';
@@ -68,24 +68,23 @@ async function fillCacheLoop() {
 // ponytail: nessun retry/backoff mirato sul singolo 429 — il loop
 // semplicemente ritenta al giro successivo. Se serve un refresh più
 // reattivo di 24h, va aggiunto un trigger esplicito qui.
-function startBackgroundRefresh() {
+export function startBackgroundRefresh() {
   fillCacheLoop().catch((e) => console.error('[exercises] catalogo non caricato:', (e as Error).message));
   setInterval(() => {
     fillCacheLoop().catch((e) => console.error('[exercises] refresh catalogo fallito:', (e as Error).message));
   }, REFRESH_INTERVAL_MS);
 }
-startBackgroundRefresh();
 
 export const exercisesRouter = Router();
 exercisesRouter.use(requirePatient);
 
-exercisesRouter.get('/exercises/bodyparts', (_req, res) => {
+export function listBodyParts(_req: Request, res: Response) {
   const set = new Set<string>();
   for (const ex of cache) for (const bp of ex.bodyParts) set.add(bp);
   res.json([...set].sort());
-});
+}
 
-exercisesRouter.get('/exercises', (req, res) => {
+export function listExercises(req: Request, res: Response) {
   const q = String(req.query.q ?? '').trim().toLowerCase();
   const bodyPart = String(req.query.bodyPart ?? '').trim().toLowerCase();
   const limit = Math.min(Number(req.query.limit) || 30, 100);
@@ -98,4 +97,8 @@ exercisesRouter.get('/exercises', (req, res) => {
   });
 
   res.json({ total: filtered.length, items: filtered.slice(offset, offset + limit), catalogReady: cache.length > 0 });
-});
+}
+
+// Stesso catalogo anche per il nutrizionista (montato in routes/nutritionist.ts).
+exercisesRouter.get('/exercises/bodyparts', listBodyParts);
+exercisesRouter.get('/exercises', listExercises);

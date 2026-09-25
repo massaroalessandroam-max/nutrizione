@@ -271,6 +271,31 @@ export interface Exercise {
   instructions: string[];
 }
 
+export type ExerciseKind = 'strength' | 'cardio';
+export interface SetEntry { weight: number; reps: number; minutes: number }
+export interface ExerciseRef { exerciseId: string; name: string; gifUrl: string; kind: ExerciseKind }
+export interface Performance { date: string; sets: SetEntry[] }
+export interface PlanExercise extends ExerciseRef {
+  sets: number; reps: number; weight: number; minutes: number;
+  last: Performance | null;
+  bestWeight: number;
+}
+export interface WorkoutPlan { id: number; name: string; startDate: string; endDate: string; createdBy: 'patient' | 'nutritionist'; exercises: PlanExercise[] }
+export interface WorkoutExercise { exerciseId: string; name: string; kind: ExerciseKind; note: string; sets: SetEntry[] }
+export interface Workout { id: number; date: string; planId: number | null; planName: string; note: string; exercises: WorkoutExercise[] }
+export interface ExerciseProgress {
+  exerciseId: string; name: string; kind: ExerciseKind; sessions: number;
+  bestWeight: number; repsAtBest: number; bestVolume: number;
+  last: { date: string; volume: number; topWeight: number; repsAtTop: number };
+  history: Array<{ date: string; topWeight: number; volume: number }>;
+}
+// Input di creazione scheda / registrazione allenamento (numeri opzionali = 0).
+export interface PlanDraftExercise extends ExerciseRef { sets: number; reps: number; weight: number; minutes: number }
+export interface PlanDraft { name: string; startDate: string; endDate: string; exercises: PlanDraftExercise[] }
+export interface WorkoutDraft { date: string; planId: number | null; note: string; exercises: WorkoutExercise[] }
+
+export interface PatientTraining { plans: WorkoutPlan[]; workouts: Workout[]; progress: ExerciseProgress[] }
+
 export type MessageSender = 'paziente' | 'nutrizionista';
 
 export interface Message {

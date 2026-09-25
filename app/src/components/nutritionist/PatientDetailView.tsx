@@ -8,14 +8,16 @@ import { MAX_PER_WEEK_LABEL, MAX_PER_WEEK_SELECT_OPTIONS } from '../../lib/planM
 import { BackArrowIcon, PlusIcon, TrashIcon } from '../../icons';
 import { api, PLAN_CATEGORIES, type Report, type PlanItem } from '../../api';
 import { ShareActions } from '../ShareActions';
+import { PatientTrainingTab } from './PatientTrainingTab';
 
-type Tab = 'diario' | 'andamento' | 'abitudini' | 'piano' | 'report' | 'messaggi';
+type Tab = 'diario' | 'andamento' | 'abitudini' | 'piano' | 'allenamento' | 'report' | 'messaggi';
 
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'diario', label: 'Diario' },
   { key: 'andamento', label: 'Andamento' },
   { key: 'abitudini', label: 'Abitudini' },
   { key: 'piano', label: 'Piano' },
+  { key: 'allenamento', label: 'Allenamento' },
   { key: 'report', label: 'Report' },
   { key: 'messaggi', label: 'Messaggi' },
 ];
@@ -286,6 +288,8 @@ export function PatientDetailView({
           </div>
         </div>
       )}
+
+      {tab === 'allenamento' && <PatientTrainingTab patientId={patient.id} />}
 
       {tab === 'abitudini' && (
         <div className="nm-habit-list" style={{ marginTop: 14 }}>

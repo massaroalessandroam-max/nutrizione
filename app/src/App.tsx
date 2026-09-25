@@ -1,12 +1,16 @@
 import { useDiario } from './hooks/useDiario';
-import { BottomNav } from './components/BottomNav';
+import { BottomNav, SubNav } from './components/BottomNav';
 import { Toast } from './components/Toast';
 import { OnboardingView } from './components/patient/OnboardingView';
 import { DiarioView } from './components/patient/DiarioView';
 import { AbitudiniView } from './components/patient/AbitudiniView';
 import { PremiView } from './components/patient/PremiView';
 import { PianoView } from './components/patient/PianoView';
-import { EserciziView } from './components/patient/EserciziView';
+import { SchedeView } from './components/patient/SchedeView';
+import { SchedaBuilder } from './components/patient/SchedaBuilder';
+import { ProgressiView } from './components/patient/ProgressiView';
+import { api } from './api';
+import { patientCatalog } from './lib/workoutMeta';
 import { ReportView } from './components/patient/ReportView';
 import { MessaggiView } from './components/patient/MessaggiView';
 import { LogSheet } from './components/sheet/LogSheet';
@@ -38,6 +42,7 @@ function App({ onLogout }: Props) {
             />
           ) : (
             <>
+              <SubNav tab={d.tab} onChange={d.setTab} />
               {d.tab === 'diario' && (
                 <DiarioView
                   state={d.appState}
@@ -54,7 +59,14 @@ function App({ onLogout }: Props) {
               {d.tab === 'abitudini' && <AbitudiniView />}
               {d.tab === 'premi' && <PremiView state={d.appState} onDayClick={d.openBackfill} />}
               {d.tab === 'piano' && <PianoView patientName={d.appState.greetingName} />}
-              {d.tab === 'esercizi' && <EserciziView />}
+              {d.tab === 'schede' && <SchedeView />}
+              {d.tab === 'crea' && (
+                <SchedaBuilder
+                  catalog={patientCatalog}
+                  onSave={async (draft) => { await api.createWorkoutPlan(draft); d.setTab('schede'); }}
+                />
+              )}
+              {d.tab === 'progressi' && <ProgressiView />}
               {d.tab === 'report' && <ReportView state={d.appState} onSetFreq={d.setFreq} />}
               {d.tab === 'messaggi' && <MessaggiView onMessagesOpened={d.refreshState} />}
             </>

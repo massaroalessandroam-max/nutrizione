@@ -1,6 +1,7 @@
 import type {
   AppState, LogResponse, NutritionistPatientListItem, NutritionistPatientDetail, Message, NutritionistTeamMember, StudioDashboard,
   MealKey, DayMealState, Schedule, FastingPref, Tone, Habit, HabitWeekDay, HabitDayItem, DayPeriod, Weekday, Appointment, Goal, GoalLevel, Exercise,
+  WorkoutPlan, Workout, ExerciseProgress, PlanDraft, WorkoutDraft, PatientTraining,
 } from './types';
 
 const PATIENT_TOKEN_KEY = 'nm_patient_token';
@@ -123,6 +124,12 @@ export const api = {
     return req<{ total: number; items: Exercise[]; catalogReady: boolean }>(`/exercises?${qs}`);
   },
   getExerciseBodyParts: () => req<string[]>('/exercises/bodyparts'),
+  getWorkoutPlans: () => req<WorkoutPlan[]>('/workout-plans'),
+  createWorkoutPlan: (draft: PlanDraft) => req<WorkoutPlan[]>('/workout-plans', { method: 'POST', body: JSON.stringify(draft) }),
+  deleteWorkoutPlan: (id: number) => req<WorkoutPlan[]>(`/workout-plans/${id}`, { method: 'DELETE' }),
+  getWorkouts: () => req<Workout[]>('/workouts'),
+  logWorkout: (draft: WorkoutDraft) => req<Workout[]>('/workouts', { method: 'POST', body: JSON.stringify(draft) }),
+  getWorkoutProgress: () => req<ExerciseProgress[]>('/workout-progress'),
 
   // ===== Dashboard nutrizionista =====
   getNutritionistPatients: () => nutriReq<NutritionistPatientListItem[]>('/nutritionist/patients'),
@@ -134,6 +141,19 @@ export const api = {
     nutriReq<Appointment[]>(`/nutritionist/patients/${id}/appointments/${appointmentId}`, { method: 'DELETE' }),
   addPatientGoal: (id: number, level: GoalLevel, text: string, targetDate: string) =>
     nutriReq<Goal[]>(`/nutritionist/patients/${id}/goals`, { method: 'POST', body: JSON.stringify({ level, text, targetDate }) }),
+  getNutritionistExercises: (params: { q?: string; bodyPart?: string; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.bodyPart) qs.set('bodyPart', params.bodyPart);
+    if (params.offset) qs.set('offset', String(params.offset));
+    return nutriReq<{ total: number; items: Exercise[]; catalogReady: boolean }>(`/nutritionist/exercises?${qs}`);
+  },
+  getNutritionistExerciseBodyParts: () => nutriReq<string[]>('/nutritionist/exercises/bodyparts'),
+  getPatientTraining: (id: number) => nutriReq<PatientTraining>(`/nutritionist/patients/${id}/training`),
+  createPatientWorkoutPlan: (id: number, draft: PlanDraft) =>
+    nutriReq<WorkoutPlan[]>(`/nutritionist/patients/${id}/workout-plans`, { method: 'POST', body: JSON.stringify(draft) }),
+  deletePatientWorkoutPlan: (id: number, planId: number) =>
+    nutriReq<WorkoutPlan[]>(`/nutritionist/patients/${id}/workout-plans/${planId}`, { method: 'DELETE' }),
   deletePatientGoal: (id: number, goalId: number) =>
     nutriReq<Goal[]>(`/nutritionist/patients/${id}/goals/${goalId}`, { method: 'DELETE' }),
   setPatientPlan: (id: number, items: PlanItem[]) =>

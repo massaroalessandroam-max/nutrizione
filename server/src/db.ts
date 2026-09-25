@@ -130,6 +130,60 @@ export async function initDb(): Promise<void> {
     );
   `);
 
+  // Schede e allenamenti. Una scheda è una lista di esercizi con target;
+  // il carico "proposto" non sta qui ma si ricava dall'ultimo allenamento
+  // registrato per quell'esercizio (workout_exercises), così scheda e
+  // storico non possono andare fuori sincrono. Le serie stanno in JSON
+  // (`sets`): non serve interrogarle una a una, si leggono sempre insieme.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workout_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      patient_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workout_plan_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL,
+      idx INTEGER NOT NULL,
+      exercise_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      gif_url TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL,
+      sets INTEGER NOT NULL DEFAULT 0,
+      reps INTEGER NOT NULL DEFAULT 0,
+      weight REAL NOT NULL DEFAULT 0,
+      minutes REAL NOT NULL DEFAULT 0
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      patient_id INTEGER NOT NULL,
+      plan_id INTEGER,
+      date TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workout_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workout_id INTEGER NOT NULL,
+      idx INTEGER NOT NULL,
+      exercise_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      sets TEXT NOT NULL DEFAULT '[]'
+    );
+  `);
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS patient_sessions (
       token_hash TEXT PRIMARY KEY,
